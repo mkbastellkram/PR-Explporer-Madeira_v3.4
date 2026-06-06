@@ -1,7 +1,7 @@
 {
-  "name": "PR Explorer Madeira V3.4.5c",
+  "name": "PR Explorer Madeira V3.4.5d",
   "short_name": "PR Explorer",
-  "start_url": "./index.html?v=3.4.5c",
+  "start_url": "./index.html?v=3.4.5d",
   "display": "standalone",
   "background_color": "#06211e",
   "theme_color": "#06211e",

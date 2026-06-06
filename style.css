@@ -13,10 +13,10 @@ body[data-theme="sunrise_canyon"]{--bg:#2b2118;--bg2:#6b3f24;--accent:#ff9f0a;--
 body[data-glass="medium"]{--card-opacity:.68;--nav-opacity:.88;--glass-blur:26px}
 body[data-glass="solid"]{--card-opacity:.94;--nav-opacity:.98;--glass-blur:4px}
 body[data-icon-size="small"]{--icon-scale:.9} body[data-icon-size="large"]{--icon-scale:1.13}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent} html,body,#app,#map{height:100%;margin:0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent} html,body,#app{height:100%;margin:0}#map{margin:0}
 @supports (height: 100dvh){html,body,#app{height:100dvh;min-height:100dvh}} body{overflow:hidden;background:var(--bg);color:var(--text)}
 #app{position:relative;background:linear-gradient(140deg,var(--bg),var(--bg2));padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
-#map{position:absolute;inset:0;z-index:0;background:#cddbd4}.leaflet-control-container{display:none}.leaflet-pane{z-index:1}.leaflet-marker-pane{z-index:550!important}.leaflet-popup{font-family:inherit}.leaflet-popup-content-wrapper{border-radius:16px}.leaflet-popup-content{margin:10px 12px;color:#123b36}.leaflet-popup-content button{font-family:inherit}
+#map{position:absolute;top:0;left:0;right:0;bottom:calc(58px + max(0px,env(safe-area-inset-bottom)));z-index:0;background:#cddbd4}.leaflet-control-container{display:none}.leaflet-pane{z-index:1}.leaflet-marker-pane{z-index:550!important}.leaflet-popup{font-family:inherit}.leaflet-popup-content-wrapper{border-radius:16px}.leaflet-popup-content{margin:10px 12px;color:#123b36}.leaflet-popup-content button{font-family:inherit}
 .hidden{display:none!important}.muted{color:var(--muted);font-size:13px;line-height:1.35}.topbar{position:absolute;z-index:720;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 8px);display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}.brand{pointer-events:auto;display:flex;flex-direction:column;padding:10px 13px;border-radius:20px;background:rgba(7,31,29,.72);color:var(--text-inv);backdrop-filter:blur(var(--glass-blur));box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.18)}.brand span{font-size:10px;letter-spacing:.18em;opacity:.72}.brand strong{font-size:17px;line-height:1.05}.brand em{font-size:11px;opacity:.66;font-style:normal}.top-actions{display:flex;gap:7px;pointer-events:auto}.glass-btn{width:42px;height:42px;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:rgba(7,31,29,.76);color:var(--text-inv);font-size:calc(18px * var(--icon-scale));backdrop-filter:blur(var(--glass-blur));box-shadow:0 10px 26px rgba(0,0,0,.22);font-weight:800}
 .quick-layer-chips{position:absolute;z-index:610;top:calc(env(safe-area-inset-top) + 74px);left:12px;right:12px;display:flex;gap:7px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none}.quick-layer-chips::-webkit-scrollbar,.filter-rail::-webkit-scrollbar,.carousel::-webkit-scrollbar{display:none}.quick-layer-chips button,.filter-chip,.type-tabs button{border:1px solid rgba(255,255,255,.48);border-radius:999px;background:rgba(255,255,255,var(--card-opacity));color:var(--text);backdrop-filter:blur(var(--glass-blur));box-shadow:0 8px 20px rgba(0,0,0,.16);font-weight:800;white-space:nowrap}.quick-layer-chips button{padding:8px 12px;font-size:12px}.quick-layer-chips button.active,.filter-chip.active,.type-tabs button.active{background:var(--accent);color:#05221e;border-color:rgba(255,255,255,.65)}
 .filter-rail{position:absolute;z-index:600;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 118px);display:flex;gap:7px;overflow-x:auto;padding-bottom:4px}.filter-chip{padding:8px 11px;font-size:12px}
@@ -85,21 +85,18 @@ body[data-icon-size="small"]{--icon-scale:.9} body[data-icon-size="large"]{--ico
 .context-thumb.tunnel,.context-marker.tunnel{background:#ece7df;color:#43362c}
 .feature-badges{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 10px}.feature-badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line-dark);background:rgba(255,255,255,.70);border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;color:var(--text)}.feature-badge.tunnel{background:#ece7df;color:#43362c}.feature-badge.waterfall{background:#dff3ff;color:#0b4c72}
 
-/* ─── Safe-Area Fix V3.4 — Home-Indikator / unterer Displayrand ─────────────
-   Stellt sicher dass die Modebar den Home-Indikator korrekt respektiert
-   und kein toter Displaybereich unter der Nav entsteht.
-   Wirkt in: Safari PWA (Add to Home Screen) + Chrome PWA + normaler Browser
-   ──────────────────────────────────────────────────────────────────────────── */
-
+/* V3.4.5D Safe-Area Map Container Fix
+   Kernregel: Leaflet-Map startet nicht mehr mit inset:0.
+   Die Karte endet initial oberhalb der Modebar + Home-Indikator.
+*/
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .modebar {
-    /* Explizite Unterstützung für Geräte ohne Home-Button (iPhone X+) */
     padding-bottom: max(6px, env(safe-area-inset-bottom));
     height: calc(58px + max(0px, env(safe-area-inset-bottom)));
   }
 
   #map {
-    /* Karte füllt bis direkt über die Modebar — keine Lücke */
     bottom: calc(58px + max(0px, env(safe-area-inset-bottom)));
   }
 }
+

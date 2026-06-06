@@ -1,5 +1,14 @@
 (() => {
 'use strict';
+  function stableInvalidateMap(reason){
+    if(!state || !state.map) return;
+    [80, 400, 900].forEach(function(ms){
+      window.setTimeout(function(){
+        try { state.map.invalidateSize(false); } catch(e) { console.warn('invalidateSize failed', reason, e); }
+      }, ms);
+    });
+  }
+
 const D = window.PRX_DATA;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -269,6 +278,13 @@ function bind(){
 function bindSheetDrag(){ const sh=$('detailSheet'), grip=$('sheetGrip'); let startY=0,dy=0,drag=false; grip.addEventListener('pointerdown',e=>{drag=true;startY=e.clientY;dy=0;sh.classList.add('dragging');grip.setPointerCapture(e.pointerId);}); grip.addEventListener('pointermove',e=>{if(!drag)return;dy=e.clientY-startY;if(dy>0)sh.style.transform=`translateY(${dy}px)`;}); grip.addEventListener('pointerup',e=>{if(!drag)return;drag=false;sh.classList.remove('dragging');try{grip.releasePointerCapture(e.pointerId)}catch{}; if(dy>90)closeSheet(); else sh.style.transform='translateY(0px)';}); grip.addEventListener('pointercancel',()=>{drag=false;sh.classList.remove('dragging');sh.style.transform='translateY(0px)';}); }
 function bindCarouselDrag(){ const shell=$('carouselShell'); let startY=0,startX=0,dy=0,dx=0,drag=false,vertical=false; shell.addEventListener('pointerdown',e=>{if(!state.selectedTrailId||e.target.closest('button'))return; drag=true; vertical=false; startY=e.clientY; startX=e.clientX; dy=dx=0; try{shell.setPointerCapture(e.pointerId)}catch{};}); shell.addEventListener('pointermove',e=>{if(!drag)return;dy=e.clientY-startY;dx=e.clientX-startX;if(!vertical&&Math.abs(dy)>16&&Math.abs(dy)>Math.abs(dx)*1.15)vertical=true;if(vertical)e.preventDefault();},{passive:false}); shell.addEventListener('pointerup',e=>{if(!drag)return;drag=false;try{shell.releasePointerCapture(e.pointerId)}catch{}; if(!vertical)return; if(dy<-54)openSheet('overview'); else if(dy>72){hideCarousel();toast('PR-Karussell ausgeblendet');}}); shell.addEventListener('pointercancel',()=>{drag=false;vertical=false;}); }
 window.PRX={ openTab(tab){openSheet(tab);}, addTrailTravel(){if(state.selectedTrailId)addTravel(state.selectedTrailId,'trail');}, fitSelected(){if(state.selectedTrailId)centerTrail(state.selectedTrailId,true);}, toggleSolo(){toggleSolo();} };
-function boot(){ applyVisualSettings(); initMap(); bind(); applyFilters(); renderDashboard(); renderTravel(); updateControls(); fitAll(); if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); }
+function boot(){ applyVisualSettings(); initMap();
+    stableInvalidateMap('init'); bind(); applyFilters(); renderDashboard(); renderTravel(); updateControls(); fitAll(); if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
+
+  window.addEventListener('resize', function(){ stableInvalidateMap('resize'); });
+  window.addEventListener('orientationchange', function(){ stableInvalidateMap('orientationchange'); });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', function(){ stableInvalidateMap('visualViewport.resize'); });
+  }
