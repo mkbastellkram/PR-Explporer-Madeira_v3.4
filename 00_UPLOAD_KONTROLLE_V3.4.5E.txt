@@ -1,0 +1,24 @@
+PR-Explorer V3.4.5F · Reparaturbericht
+Ausgangslage: Der von dir hochgeladene GitHub-ZIP-Stand wurde geprüft.
+Befund:
+- index.html: <!doctype html>\n<html lang="de">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-sca
+- style.css: :root{\n  --bg:#06211e; --bg2:#0f302d; --surface:rgba(255,255,255,.78); --surface-strong:rgba(255,255,255,.92); --surface-dark:rgba(7,31,29,.86);\n  --text:#102b2
+- app.js: <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Komoot</title><path d="M9.8 14.829l2.2-3.43 2.2 3.43 5.962 5.962A11.946 11.946 0 0
+- data.js: window.PRX_DATA = {"version":"3.4.5","generatedFrom":"PR – V1.xlsx + Gpx.zip + KML.zip (GPX elevation profiles integrated where GPX contains ele)","home":{"na
+- manifest.webmanifest: {\n  "name": "PR Explorer Madeira V3.4.5",\n  "short_name": "PR Explorer",\n  "start_url": "./index.html?v=3.4.5",\n  "display": "standalone",\n  "background_color":
+- service-worker.js: const CACHE='pr-explorer-v3-4-4';\nconst ASSETS=['./','./index.html','./style.css','./app.js','./data.js','./manifest.webmanifest'];\nself.addEventListener('insta
+
+Hauptfehler:
+- index.html ist HTML und grundsätzlich vorhanden.
+- app.js ist beschädigt: Dort steht SVG-/Komoot-Icon-Code statt JavaScript-App-Code.
+- service-worker.js hatte noch alten Cache-Stand.
+
+Reparatur:
+- app.js aus intakter V3.4.5E-Quelle wiederhergestellt.
+- data.js aus intakter V3.4.5E-Quelle wiederhergestellt.
+- index.html mit Cache-Buster und Leaflet-Fallback beibehalten.
+- service-worker.js mit neuem Cache pr-explorer-v3-4-5e beibehalten.
+
+Upload-Regel:
+- ZIP enthält Dateien direkt im Root, keinen Oberordner.
+- In GitHub diese Kerndateien im Zielordner vollständig ersetzen: index.html, style.css, app.js, data.js, manifest.webmanifest, service-worker.js.
