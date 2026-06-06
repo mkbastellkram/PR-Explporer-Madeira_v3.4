@@ -1,0 +1,13 @@
+PR-Explorer V3.4.7 INTRO LAZY MAP FIX
+
+Korrektur gegenüber V3.4.6:
+- Button ist klickbar.
+- Lazy-Map-Helfer liegen korrekt innerhalb der App-IIFE.
+- Keine app.js-Helfer nach dem schließenden })();
+- stableInvalidateMap nutzt die echte Leaflet-Variable map, nicht state.map.
+- boot() initialisiert Leaflet nicht mehr direkt.
+- Intro liegt innerhalb #app als absolute Vollfläche.
+- Grüner App-Bereich unten wird bewusst als App-Hintergrund eingebunden.
+
+Test-URL:
+https://mkbastellkram.github.io/PR-Explorer-Madeira_v3.4/index.html?v=3.4.7

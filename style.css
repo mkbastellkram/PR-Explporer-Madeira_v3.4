@@ -85,7 +85,7 @@ body[data-icon-size="small"]{--icon-scale:.9} body[data-icon-size="large"]{--ico
 .context-thumb.tunnel,.context-marker.tunnel{background:#ece7df;color:#43362c}
 .feature-badges{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 10px}.feature-badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line-dark);background:rgba(255,255,255,.70);border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;color:var(--text)}.feature-badge.tunnel{background:#ece7df;color:#43362c}.feature-badge.waterfall{background:#dff3ff;color:#0b4c72}
 
-/* V3.4.6 Safe-Area Map Container Fix
+/* V3.4.7 Safe-Area Map Container Fix
    Kernregel: Leaflet-Map startet nicht mehr mit inset:0.
    Die Karte endet initial oberhalb der Modebar + Home-Indikator.
 */
@@ -100,17 +100,18 @@ body[data-icon-size="small"]{--icon-scale:.9} body[data-icon-size="large"]{--ico
   }
 }
 
-/* V3.4.6 Intro / Lazy Map Init Test */
+/* V3.4.7 Intro / Lazy Map Init Fix */
 .intro-screen{
-  position:fixed;
+  position:absolute;
   inset:0;
   z-index:2000;
   display:flex;
   align-items:center;
   justify-content:center;
   padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
-  background:#000;
+  background:linear-gradient(180deg,#000 0%,#000 82%,var(--bg) 100%);
   color:#f4fbf8;
+  pointer-events:auto;
 }
 .intro-screen.hidden{display:none!important}
 .intro-card{
@@ -150,7 +151,11 @@ body[data-icon-size="small"]{--icon-scale:.9} body[data-icon-size="large"]{--ico
   background:#42d39c;
   color:#051715;
   box-shadow:0 12px 30px rgba(66,211,156,.22);
+  cursor:pointer;
+  pointer-events:auto;
+  touch-action:manipulation;
 }
+.intro-start:active{transform:scale(.985)}
 .intro-card small{
   display:block;
   margin-top:12px;
@@ -164,5 +169,6 @@ body.intro-active .modebar,
 body.intro-active .carousel-shell,
 body.intro-active .detail-sheet{
   visibility:hidden;
+  pointer-events:none;
 }
 
