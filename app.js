@@ -60,14 +60,7 @@ function initMap(){
   ['pins','tracks','drives','context','highlight','endpoints','home'].forEach(k=>layers[k]=L.layerGroup().addTo(map));
   const homeIcon=L.divIcon({className:'',html:'<div class="home-marker">⌂</div>',iconSize:[34,34],iconAnchor:[17,17]});
   L.marker([D.home.lat,D.home.lon],{icon:homeIcon,title:D.home.name,zIndexOffset:600}).bindPopup(`<b>${esc(D.home.name)}</b><br>Hotel / Home-Pin`).addTo(layers.home);
-  renderMap();
-  // PRX-V3.4.9: Triple invalidateSize — ensures Leaflet measures correct map height
-  // after CSS geometry fix (bottom nav no longer inflated by double safe-area)
-  requestAnimationFrame(()=>{
-    map.invalidateSize(true);
-    setTimeout(()=>map.invalidateSize(true),150);
-    setTimeout(()=>map.invalidateSize(true),500);
-  });
+  renderMap(); requestAnimationFrame(()=>{map.invalidateSize(true);setTimeout(()=>map.invalidateSize(true),150);setTimeout(()=>map.invalidateSize(true),500);});
 }
 
 function applyFilters(){
