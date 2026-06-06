@@ -1,0 +1,89 @@
+/* PRX-FIX-V3.4.8 | Fullscreen App Shell + Leaflet Container Guard
+   Ziel: iOS/PWA gibt Leaflet vor dem Init einen stabilen Vollflächen-Container.
+   Einbindung: diese Datei nach der bestehenden App-CSS laden. */
+
+:root {
+  --prx-bottom-nav-h: 112px;
+  --prx-top-ui-h: 0px;
+  --prx-bg: #001f1a;
+}
+
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+  background: var(--prx-bg) !important;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed !important;
+  inset: 0 !important;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+#appShell,
+.app-shell,
+.prx-app-shell,
+body > .app {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+  background: var(--prx-bg) !important;
+}
+
+#prxMapViewport {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: calc(var(--prx-bottom-nav-h) + env(safe-area-inset-bottom, 0px)) !important;
+  width: 100vw !important;
+  overflow: hidden !important;
+  background: #9fd7e0 !important;
+  z-index: 1 !important;
+  contain: layout size paint;
+}
+
+#map,
+.map,
+.leaflet-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+}
+
+/* bekannte Bottom-Nav-Varianten stabilisieren */
+#bottomNav,
+.bottom-nav,
+.prx-bottom-nav,
+.tabbar,
+nav[aria-label="Hauptnavigation"] {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 80 !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+#introOverlay,
+#prxIntro,
+.prx-intro-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  z-index: 9999 !important;
+}
