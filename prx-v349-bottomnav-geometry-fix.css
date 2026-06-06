@@ -1,0 +1,187 @@
+/* PRX-FIX-V3.4.9 | Bottom Navigation Geometry Fix
+   Ziel: Bottom Navigation kompakt halten, Karte bis direkt oberhalb der Nav führen.
+   Diese Datei nach der bestehenden App-CSS und nach V3.4.8-CSS laden. */
+
+:root {
+  --prx-bottom-nav-core: 86px;
+  --prx-bottom-nav-total: calc(var(--prx-bottom-nav-core) + env(safe-area-inset-bottom, 0px));
+  --prx-bottom-nav-item-h: 68px;
+  --prx-bottom-nav-bg: #002b25;
+  --prx-map-bg: #9fd7e0;
+}
+
+html,
+body {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #001f1a !important;
+}
+
+body {
+  position: fixed !important;
+  inset: 0 !important;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+#appShell,
+.app-shell,
+.prx-app-shell,
+body > .app,
+body[data-prx-v349] > main:first-child {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+  background: #001f1a !important;
+}
+
+/* Karten-Slot: endet exakt oberhalb der kompakten BottomNav. */
+#prxMapViewport,
+#mapViewport,
+.map-viewport,
+.prx-map-viewport {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: var(--prx-bottom-nav-total) !important;
+  width: 100vw !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  background: var(--prx-map-bg) !important;
+  z-index: 1 !important;
+  contain: layout size paint;
+}
+
+#map,
+.map,
+.leaflet-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+}
+
+/* Bottom Navigation: keine aufgeblasene 112/120px-Geometrie mehr. */
+#bottomNav,
+.bottom-nav,
+.prx-bottom-nav,
+.tabbar,
+nav[aria-label="Hauptnavigation"],
+.prx-v349-bottomnav {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+
+  height: var(--prx-bottom-nav-total) !important;
+  min-height: var(--prx-bottom-nav-total) !important;
+  max-height: var(--prx-bottom-nav-total) !important;
+
+  padding-top: 0 !important;
+  padding-right: max(16px, env(safe-area-inset-right, 0px)) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  background: var(--prx-bottom-nav-bg) !important;
+  z-index: 80 !important;
+  overflow: hidden !important;
+}
+
+/* Falls die App eine innere Nav-Leiste nutzt. */
+#bottomNav > *,
+.bottom-nav > *,
+.prx-bottom-nav > *,
+.tabbar > *,
+nav[aria-label="Hauptnavigation"] > *,
+.prx-v349-bottomnav > * {
+  align-self: center !important;
+  max-height: var(--prx-bottom-nav-item-h) !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+
+#bottomNav button,
+#bottomNav a,
+.bottom-nav button,
+.bottom-nav a,
+.prx-bottom-nav button,
+.prx-bottom-nav a,
+.tabbar button,
+.tabbar a,
+nav[aria-label="Hauptnavigation"] button,
+nav[aria-label="Hauptnavigation"] a,
+.prx-v349-bottomnav button,
+.prx-v349-bottomnav a,
+.nav-item,
+.bottom-nav-item,
+[role="tab"] {
+  height: var(--prx-bottom-nav-item-h) !important;
+  min-height: 0 !important;
+  max-height: var(--prx-bottom-nav-item-h) !important;
+  padding: 6px 10px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  box-sizing: border-box !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  line-height: 1.1 !important;
+}
+
+#bottomNav .active,
+.bottom-nav .active,
+.prx-bottom-nav .active,
+.tabbar .active,
+nav[aria-label="Hauptnavigation"] .active,
+.prx-v349-bottomnav .active,
+.nav-item.active,
+.bottom-nav-item.active,
+[role="tab"][aria-selected="true"] {
+  height: var(--prx-bottom-nav-item-h) !important;
+  max-height: var(--prx-bottom-nav-item-h) !important;
+  border-radius: 24px !important;
+}
+
+/* Floating-Elemente, Karussell und Sheets dürfen sich künftig an dieser unteren Kante orientieren. */
+.prx-carousel,
+#prxCarousel,
+.route-carousel,
+.floating-carousel,
+.peek-sheet,
+.prx-peek-sheet {
+  --prx-safe-bottom-anchor: var(--prx-bottom-nav-total);
+}
+
+/* Intro bleibt reines Overlay und darf die App-Geometrie nicht verändern. */
+#introOverlay,
+#prxIntro,
+.prx-intro-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  z-index: 9999 !important;
+}
