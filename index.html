@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>PR Explorer Madeira · V3.4.1</title>
+  <title>PR Explorer Madeira · V3.4.2</title>
   <meta name="theme-color" content="#06211e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,7 +20,7 @@
     <div class="brand">
       <span>MADEIRA</span>
       <strong>PR Explorer</strong>
-      <em>V3.4.1</em>
+      <em>V3.4.2</em>
     </div>
     <div class="top-actions">
       <button id="locateBtn" class="glass-btn" title="Standort">⌖</button>
@@ -49,6 +49,7 @@
     <button class="filter-chip" data-filter="status" data-value="open">● Offen</button>
     <button class="filter-chip" data-filter="status" data-value="limited">● Eingeschränkt</button>
     <button class="filter-chip" data-filter="status" data-value="closed">● Gesperrt</button>
+    <button class="filter-chip" id="resetFiltersBtn">Alle PR</button>
     <button class="filter-chip" id="searchBtn">Suchen</button>
   </section>
 
@@ -96,6 +97,11 @@
   <section class="travel-panel hidden" id="travelPanel">
     <div class="panel-head"><strong>Reise-Sammlung</strong><button id="closeTravel">×</button></div>
     <div class="muted">V3.4 sammelt PRs und POIs. Tagesplanung und Teilnehmer folgen später.</div>
+    <div class="travel-dates">
+      <label>Reisebeginn <input id="travelStart" type="date"></label>
+      <label>Reiseende <input id="travelEnd" type="date"></label>
+    </div>
+    <div id="travelDateHint" class="muted"></div>
     <div id="travelList" class="travel-list"></div>
   </section>
 

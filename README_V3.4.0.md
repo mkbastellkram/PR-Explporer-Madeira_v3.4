@@ -1,47 +1,32 @@
-# PR Explorer Madeira · V3.3.3
+# PR Explorer Madeira · V3.4.0
 
-Statusmodul auf Basis von MadeiraJourney / IFCN-Aggregat, Stand 05.06.2026 15:40.
+Build auf Basis des V3.4-Ausführungspakets.
 
-## Neu in V3.3.3
+## Schwerpunkt
 
-- lokale Statusdatei `window.PRX_DATA.statuses`
-- Status-Ampel am PR-Pin aktiv: offen / eingeschränkt / gesperrt / unbekannt
-- Status-Chip in PR-Karte und Detail-Sheet
-- Statusfilter: Offen, Eingeschränkt, Gesperrt
-- Quellen-/Stand-Hinweis im Detail-Sheet
-- PR3 Madeira bleibt offen; Porto-Santo-PR3 ist geschlossen und wird nicht auf Madeira-PR3 übertragen
+- Bottom Navigation: Karte · Journal · Reise · Dashboard
+- Einstellungen per Zahnrad oben rechts
+- OSM Standard als Startkarte, Topo/Satellit per Schnellchip
+- OSM Hiking / Waymarked Trails integriert
+- Aktive PR zeigt GPX und KML automatisch
+- Floating PR-Karussell horizontal, vertikal fixiert
+- Hochwischen öffnet Detail, ohne Kachel mitzuziehen
+- Detail-Sheet mit Übersicht, Webcams, POIs, Anfahrt, Profil, Links, Notizen
+- POI/Webcam-Kontext nur aktiv ausgewählt; alter Kontext wird beim PR-Wechsel gelöscht
+- Reise-Sammlung als Basis, Ausblenden statt Löschen
+- Theme-Presets und Glass-/Icon-Größen in Einstellungen
+- Höhenprofil als SVG Clean Area mit Daten-Fallback
+- Plattform-SVGs für automatische Suche eingebunden
+- Datenfelder für Roadmap vorbereitet: routeType, Contributor, categoryId/baseIconId, POI hidden/archived
 
-## Statusdaten
+## Nicht enthalten
 
-Quelle: MadeiraJourney Trails Status, laut Seite aus IFCN-Daten aggregiert.
-Offizielle Prüfung vor jeder Wanderung weiterhin erforderlich.
+- kein echter GPX/KML-Importdialog
+- keine Gruppenplanung-UI
+- kein Kalender-Sync
+- keine Heatmap
+- kein Live-POI-Scraping
 
-Geschlossen:
-- PR1.3
-- PR7
-- PR10
-- PR20
-- PR27
-- PR28
+## Upload
 
-Eingeschränkt:
-- PR4
-- PR12
-
-Offen:
-- übrige im Datenbestand vorhandene Madeira-PRs laut Statusliste / Einzelliste
-
-## Test
-
-Öffnen mit:
-
-`index.html?v=3.3.3`
-
-Testpunkte:
-
-1. Ampelpunkte an Pins sichtbar.
-2. Statusfilter begrenzt die PRs.
-3. Detail-Sheet zeigt Quelle und Stand.
-4. PR4 / PR12 orange.
-5. PR1.3 / PR7 / PR10 / PR20 / PR27 / PR28 rot.
-6. PR3 Madeira bleibt grün/offen.
+Den Inhalt dieses Ordners in den bisherigen GitHub-Pages-Ordner kopieren oder als neuen Versionsordner testen.
