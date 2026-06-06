@@ -1,0 +1,5 @@
+PR Explorer V3.4.5G SINGLE FILE
+Nur index.html muss in GitHub ersetzt werden.
+Diese index.html enthält CSS, Daten und App-Code direkt eingebettet.
+Test-URL: /PR-Explorer-Madeira_v3.4/index.html?v=3.4.5g
+Wenn diese Version läuft, war das Problem definitiv die Mehrdateien-Zuordnung oder ein Cache-/Pfadproblem.
