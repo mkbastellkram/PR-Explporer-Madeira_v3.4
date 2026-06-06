@@ -1,5 +1,38 @@
 (() => {
 'use strict';
+  function stableInvalidateMap(reason){
+    if(!map) return;
+    [80, 400, 900].forEach(function(ms){
+      window.setTimeout(function(){
+        try { map.invalidateSize(false); } catch(e) { console.warn('invalidateSize failed', reason, e); }
+      }, ms);
+    });
+  }
+
+
+function updateSafeAreaVars(){
+  let bottom = 0;
+  if(window.visualViewport){
+    bottom = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+  }
+  document.documentElement.style.setProperty('--sat-bottom', bottom + 'px');
+}
+
+function getSafeBottom(){
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--sat-bottom');
+  const parsed = parseFloat(raw);
+  if(Number.isFinite(parsed)) return parsed;
+  if(window.visualViewport) return Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+  return 0;
+}
+
+function mapFitPaddingBottom(){
+  return 120 + getSafeBottom();
+}
+
+
+
+
 const D = window.PRX_DATA;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -9,7 +42,8 @@ const fmtMin = v => v ? `${v} min` : '–';
 const normLevel = s => (String(s||'').toLowerCase().includes('leicht')?'leicht':String(s||'').toLowerCase().includes('schwer')?'schwer':String(s||'').toLowerCase().includes('mittel')?'mittel':'k.A.');
 const ll = x => [x.lat, x.lng ?? x.lon];
 const hav = (a,b,c,d) => { const R=6371, to=x=>x*Math.PI/180; const dLat=to(c-a), dLon=to(d-b); const q=Math.sin(dLat/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(q)); };
-const settingsDefault = {theme:'madeira_deep_forest', glass:'light', iconSize:'medium', profileStyle:'clean_area', lineWidth:5, outlineWidth:1, lineOpacity:92, routeType:'all'};
+const settingsDefault = {theme:'madeira_deep_forest', glass:'light', iconSize:'medium', profileStyle:'clean_area', lineWidth:5, outlineWidth:1, lineOpacity:92, routeType:'all', autoFit:'manual'};
+const FEATURE_CORRIDOR_KM = ((D.featureLayerMeta && D.featureLayerMeta.corridorMeters) || 100) / 1000;
 const loadJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || JSON.stringify(d)); } catch { return d; } };
 const saveJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
@@ -20,9 +54,10 @@ let state = {
   mode:'map', level:'all', statusFilter:'all', query:'', onlyFav:false, onlyCollected:false, routeType:'all', base:'light',
   layers:{pins:true, tracks:true, drives:true, hiking:true, context:false},
   selectedTrailId:null, selectedPoiIds:[], selectedWebcamIds:[], solo:false, sheetTab:'overview',
-  travel:loadJSON('prxTravelV34', []), hiddenTravel:loadJSON('prxHiddenTravelV34', []), favs:new Set(loadJSON('prxFavs', [])), settings:{...settingsDefault, ...loadJSON('prxVisualSettingsV34', {})}
+  travel:loadJSON('prxTravelV34', []), hiddenTravel:loadJSON('prxHiddenTravelV34', []), tripDates:loadJSON('prxTripDatesV34', {start:'', end:''}), favs:new Set(loadJSON('prxFavs', [])), settings:{...settingsDefault, ...loadJSON('prxVisualSettingsV34', {})}
 };
 let map, bases={}, overlays={}, activeBase, layers={}, markers={}, filtered=[...trails];
+let prxLazyMapStarted = false;
 
 function applyVisualSettings(){
   document.body.dataset.theme = state.settings.theme || settingsDefault.theme;
@@ -33,7 +68,7 @@ function applyVisualSettings(){
   set('lineWidth', state.settings.lineWidth); set('outlineWidth', state.settings.outlineWidth); set('lineOpacity', state.settings.lineOpacity);
   saveJSON('prxVisualSettingsV34', state.settings);
 }
-function saveState(){ saveJSON('prxFavs', [...state.favs]); saveJSON('prxTravelV34', state.travel); saveJSON('prxHiddenTravelV34', state.hiddenTravel); saveJSON('prxVisualSettingsV34', state.settings); }
+function saveState(){ saveJSON('prxFavs', [...state.favs]); saveJSON('prxTravelV34', state.travel); saveJSON('prxHiddenTravelV34', state.hiddenTravel); saveJSON('prxTripDatesV34', state.tripDates); saveJSON('prxVisualSettingsV34', state.settings); }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.add('hidden'),1900); }
 
 function trailStatus(t){
@@ -58,9 +93,9 @@ function initMap(){
   activeBase = bases[state.base || 'light'].addTo(map);
   overlays.hiking.addTo(map);
   ['pins','tracks','drives','context','highlight','endpoints','home'].forEach(k=>layers[k]=L.layerGroup().addTo(map));
-  const homeIcon=L.divIcon({className:'',html:'<div class="home-marker">⌂</div>',iconSize:[34,34],iconAnchor:[17,17]});
+  const homeIcon=L.divIcon({className:'',html:'<div class="home-marker"><span class="cu cu-home"></span></div>',iconSize:[34,34],iconAnchor:[17,17]});
   L.marker([D.home.lat,D.home.lon],{icon:homeIcon,title:D.home.name,zIndexOffset:600}).bindPopup(`<b>${esc(D.home.name)}</b><br>Hotel / Home-Pin`).addTo(layers.home);
-  renderMap(); requestAnimationFrame(()=>{map.invalidateSize(true);setTimeout(()=>map.invalidateSize(true),150);setTimeout(()=>map.invalidateSize(true),500);});
+  renderMap(); setTimeout(()=>map.invalidateSize(),120);
 }
 
 function applyFilters(){
@@ -72,13 +107,23 @@ function applyFilters(){
   $('resultCount').textContent = `${filtered.length} PRs im Filter`;
   renderMap(); renderJournal(); renderCarousel(); renderDashboard(); updateControls();
 }
+function resetFilters(){
+  state.level='all'; state.statusFilter='all'; state.query=''; state.onlyFav=false; state.onlyCollected=false; state.routeType='all';
+  const si=$('searchInput'); if(si) si.value='';
+  document.querySelectorAll('.filter-chip[data-filter="level"]').forEach(x=>x.classList.toggle('active',x.dataset.value==='all'));
+  document.querySelectorAll('.filter-chip[data-filter="status"]').forEach(x=>x.classList.remove('active'));
+  const fav=document.querySelector('[data-filter="fav"]'), col=document.querySelector('[data-filter="collected"]');
+  if(fav) fav.classList.remove('active'); if(col) col.classList.remove('active');
+  applyFilters(); fitAll(); toast('Alle PRs wieder angezeigt');
+}
 function syncOverlayLayers(){
   if(overlays.hiking){ const on=map.hasLayer(overlays.hiking); if(state.layers.hiking && !on) overlays.hiking.addTo(map); if(!state.layers.hiking && on) map.removeLayer(overlays.hiking); }
 }
 function setBase(base){ if(activeBase) map.removeLayer(activeBase); state.base=base; activeBase=bases[base].addTo(map); updateControls(); }
-function fitAll(){ const pts=(state.selectedTrailId&&state.solo)?selectedBoundsPoints():filtered.map(t=>[t.lat,t.lon]); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,80],maxZoom:14}); setTimeout(()=>map.invalidateSize(),80); }
+function fitAll(){ if(!map) return; /* lazy-map guard fitAll */ const pts=(state.selectedTrailId&&state.solo)?selectedBoundsPoints():filtered.map(t=>[t.lat,t.lon]); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,mapFitPaddingBottom()],maxZoom:14}); setTimeout(()=>map.invalidateSize(),80); }
 function selectedBoundsPoints(){ const id=state.selectedTrailId, t=byId[id]; return [[t.lat,t.lon],...(D.tracks[id]||[]),...(D.drives[id]||[])]; }
-function centerTrail(id, fit=false){ const t=byId[id]; if(!t||!map) return; if(fit){ const pts=selectedBoundsPoints(); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,80],maxZoom:14}); } else map.panTo([t.lat,t.lon],{animate:true,duration:.45}); setTimeout(()=>map.invalidateSize(),80); }
+function centerTrail(id, fit=false){ if(!map) return; /* lazy-map guard centerTrail */ const t=byId[id]; if(!t||!map) return; if(fit){ const pts=selectedBoundsPoints(); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,mapFitPaddingBottom()],maxZoom:14}); } else map.panTo([t.lat,t.lon],{animate:true,duration:.45}); setTimeout(()=>map.invalidateSize(),80); }
+function activeBoundsMostlyVisible(id){ if(!map||!id) return true; const pts=selectedBoundsPoints(); if(!pts.length) return true; const b=L.latLngBounds(pts), mb=map.getBounds(); return mb.intersects(b) && mb.contains(b.getCenter()); }
 function lineCased(group, coords, color, width, opacity){ if(!coords||coords.length<2) return; const ow=Number(state.settings.outlineWidth)||0; if(ow>0) L.polyline(coords,{color:'#fff',weight:width+ow*2,opacity:.92,lineCap:'round',lineJoin:'round'}).addTo(group); L.polyline(coords,{color,weight:width,opacity,lineCap:'round',lineJoin:'round'}).addTo(group); }
 function markerHtml(t){ const active=state.selectedTrailId===t.id, dim=state.solo&&!active, st=trailStatus(t), fav=state.favs.has(t.id), collected=isCollected(t.id,'trail'); const nr=esc(t.number.replace('PR ','').replace('.','·')); return `<div class="pr-marker ${active?'active':''} ${dim?'dim':''} status-${st.key}"><span class="pr-num">${nr}</span><i class="status-dot ${st.key}"></i>${fav?'<i class="fav-dot">★</i>':''}${collected?'<i class="trip-dot"></i>':''}</div>`; }
 function markerIcon(t){ return L.divIcon({className:'',html:markerHtml(t),iconSize:[42,42],iconAnchor:[21,21]}); }
@@ -98,56 +143,154 @@ function renderMap(){
   renderContextMarkers(); updateControls();
 }
 function clearContext(){ state.selectedPoiIds=[]; state.selectedWebcamIds=[]; layers.context?.clearLayers(); layers.highlight?.clearLayers(); }
-function selectTrail(id, opts={}){ if(!byId[id]) return; const changed=state.selectedTrailId!==id; if(changed) clearContext(); state.selectedTrailId=id; state.sheetTab='overview'; state.layers.tracks=true; state.layers.drives=true; showCarousel(); renderMap(); renderCarousel(); renderSheet(); renderJournal(); renderDashboard(); updateControls(); if(opts.fromMap||opts.fromJournal) centerTrail(id,false); }
+function selectTrail(id, opts={}){ if(!byId[id]) return; const changed=state.selectedTrailId!==id; if(changed) clearContext(); state.selectedTrailId=id; state.sheetTab='overview'; state.layers.tracks=true; state.layers.drives=true; showCarousel(); renderMap(); renderCarousel(); renderSheet(); renderJournal(); renderDashboard(); updateControls(); if(opts.fromMap||opts.fromJournal) centerTrail(id,false); if(opts.fromCarousel && !activeBoundsMostlyVisible(id)) toast('Route liegt außerhalb · Einpassen antippen'); }
 
 function carouselList(){ if(!state.selectedTrailId) return filtered; let list=filtered.length?[...filtered]:trails; if(!list.find(t=>t.id===state.selectedTrailId)) list=[byId[state.selectedTrailId],...list.filter(Boolean)]; return list.filter(Boolean).slice(0,30); }
 function showCarousel(){ $('carouselShell').classList.remove('hidden','dragging'); }
 function hideCarousel(){ $('carouselShell').classList.add('hidden'); }
-function renderCarousel(){ const root=$('carousel'); if(!root) return; if(!state.selectedTrailId){root.innerHTML='';return;} const list=carouselList(); root.innerHTML=list.map(cardHtml).join(''); root.querySelectorAll('.trail-card').forEach(el=>el.addEventListener('click',e=>{ if(e.target.closest('button,a')) return; selectTrail(el.dataset.id,{fromCarousel:true}); })); root.querySelectorAll('[data-act="detail"]').forEach(b=>b.onclick=e=>{e.stopPropagation();openSheet('overview');}); root.querySelectorAll('[data-act="solo"]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleSolo();}); root.querySelectorAll('[data-act="fav"]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleFav(b.closest('.trail-card').dataset.id);}); root.querySelectorAll('[data-act="travel"]').forEach(b=>b.onclick=e=>{e.stopPropagation();addTravel(b.closest('.trail-card').dataset.id,'trail');}); const active=root.querySelector('.trail-card.active'); if(active) setTimeout(()=>active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}),40); }
-function cardHtml(t){ const lev=normLevel(t.level), active=t.id===state.selectedTrailId, fav=state.favs.has(t.id), collected=isCollected(t.id,'trail'); return `<article class="trail-card ${active?'active':''}" data-id="${esc(t.id)}"><div class="card-top"><div class="num">${esc(t.number)}</div><div style="display:flex;gap:6px;align-items:center">${statusHtml(t)}<div class="level ${esc(lev)}">${esc(t.level||'k.A.')}</div></div></div><h3>${esc(t.name)}</h3><div class="meta"><span>${fmtKm(t.distanceKm)}</span><span>${fmt(t.duration)}</span><span>${fmtMin(t.driveMin)}</span></div><div class="profile-note">Hochwischen öffnet Details · GPX ${D.tracks[t.id]?'✓':'–'} · KML ${D.drives[t.id]?'✓':'–'}</div><div class="card-actions"><button class="pillbtn" data-act="detail">Detail</button><button class="pillbtn" data-act="solo">${state.solo&&active?'Übersicht':'Solo'}</button><button class="pillbtn warn" data-act="fav">${fav?'★':'☆'}</button><button class="pillbtn ${collected?'primary':''}" data-act="travel">Reise</button></div></article>`; }
+function renderCarousel(){ const root=$('carousel'); if(!root) return; if(!state.selectedTrailId){root.innerHTML='';return;} const list=carouselList(); root.innerHTML=list.map(cardHtml).join(''); root.querySelectorAll('.trail-card').forEach(el=>el.addEventListener('click',e=>{ if(e.target.closest('button,a')) return; selectTrail(el.dataset.id,{fromCarousel:true}); })); root.querySelectorAll('[data-act="detail"]').forEach(b=>b.onclick=e=>{e.stopPropagation();openSheet('overview');}); root.querySelectorAll('[data-act="solo"]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleSolo();}); root.querySelectorAll('[data-act="fit"]').forEach(b=>b.onclick=e=>{e.stopPropagation();const id=b.closest('.trail-card').dataset.id;selectTrail(id,{fromCarousel:true});centerTrail(id,true);}); root.querySelectorAll('[data-act="fav"]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleFav(b.closest('.trail-card').dataset.id);}); root.querySelectorAll('[data-act="travel"]').forEach(b=>b.onclick=e=>{e.stopPropagation();addTravel(b.closest('.trail-card').dataset.id,'trail');}); const active=root.querySelector('.trail-card.active'); if(active) setTimeout(()=>active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}),40); }
+function cardHtml(t){ const lev=normLevel(t.level), active=t.id===state.selectedTrailId, fav=state.favs.has(t.id), collected=isCollected(t.id,'trail'); return `<article class="trail-card ${active?'active':''}" data-id="${esc(t.id)}"><div class="card-top"><div class="num">${esc(t.number)}</div><div style="display:flex;gap:6px;align-items:center">${statusHtml(t)}<div class="level ${esc(lev)}">${esc(t.level||'k.A.')}</div></div></div><h3>${esc(t.name)}</h3><div class="meta"><span>${fmtKm(t.distanceKm)}</span><span>${fmt(t.duration)}</span><span>${fmtMin(t.driveMin)}</span></div><div class="profile-note">Hochwischen öffnet Details · Einpassen zeigt GPX/KML vollständig</div><div class="card-actions"><button class="pillbtn" data-act="detail">Detail</button><button class="pillbtn" data-act="solo">${state.solo&&active?'Übersicht':'Solo'}</button><button class="pillbtn" data-act="fit">Einpassen</button><button class="pillbtn warn" data-act="fav">${fav?'★':'☆'}</button><button class="pillbtn ${collected?'primary':''}" data-act="travel">Reise</button></div></article>`; }
 function toggleSolo(){ if(!state.selectedTrailId) return; state.solo=!state.solo; clearContext(); if(state.solo){state.layers.tracks=true;state.layers.drives=true;} renderMap(); renderCarousel(); renderSheet(); state.solo?centerTrail(state.selectedTrailId,true):fitAll(); toast(state.solo?'Fokusmodus aktiv':'Gesamtkarte aktiv'); }
 function toggleFav(id){ state.favs.has(id)?state.favs.delete(id):state.favs.add(id); saveState(); applyFilters(); renderSheet(); toast(state.favs.has(id)?'Favorit gesetzt':'Favorit entfernt'); }
 
 function openSheet(tab='overview'){ state.sheetTab=tab; const sh=$('detailSheet'); sh.classList.remove('hidden'); sh.style.transform='translateY(0px)'; renderSheet(); setTimeout(()=>map.invalidateSize(),80); }
 function closeSheet(){ const sh=$('detailSheet'); sh.classList.add('hidden'); sh.style.transform=''; setTimeout(()=>map.invalidateSize(),80); }
-function renderSheet(){ const id=state.selectedTrailId, t=byId[id], root=$('sheetContent'); if(!t){root.innerHTML='';return;} root.innerHTML=`<div class="sheet-head"><div class="sheet-title"><small>${esc(t.number)} · ${esc(t.region||'Madeira')} · ${statusHtml(t)}</small><h2>${esc(t.name)}</h2></div><button class="close" id="closeSheet">×</button></div>${statusSourceHtml()}<div class="seg"><button data-tab="overview">Übersicht</button><button data-tab="webcams">Webcams</button><button data-tab="pois">POIs</button><button data-tab="drive">Anfahrt</button><button data-tab="profile">Profil</button><button data-tab="links">Links</button><button data-tab="notes">Notizen</button></div><div class="facts"><div class="fact"><small>Distanz</small><b>${fmtKm(t.distanceKm)}</b></div><div class="fact"><small>Dauer</small><b>${fmt(t.duration)}</b></div><div class="fact"><small>Anfahrt</small><b>${fmtMin(t.driveMin)}</b></div><div class="fact"><small>Höhenmeter</small><b>${fmt(t.elev)} m</b></div></div><div id="tabContent"></div>`; root.querySelector('#closeSheet').onclick=closeSheet; root.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===state.sheetTab); b.onclick=()=>{state.sheetTab=b.dataset.tab; renderSheet();};}); const tab=$('tabContent'); if(state.sheetTab==='overview') tab.innerHTML=overviewHtml(t); if(state.sheetTab==='profile') tab.innerHTML=profileHtml(t); if(state.sheetTab==='webcams') tab.innerHTML=contextHtml('webcam', relatedWebcams(t)); if(state.sheetTab==='pois') tab.innerHTML=contextHtml('poi', relatedPois(t)); if(state.sheetTab==='drive') tab.innerHTML=driveHtml(t); if(state.sheetTab==='links') tab.innerHTML=linksHtml(t); if(state.sheetTab==='notes') tab.innerHTML=notesHtml(t); tab.querySelectorAll('[data-focus-poi]').forEach(b=>b.onclick=()=>togglePoi(b.dataset.focusPoi)); tab.querySelectorAll('[data-focus-webcam]').forEach(b=>b.onclick=()=>toggleWebcam(b.dataset.focusWebcam)); tab.querySelectorAll('[data-add-travel]').forEach(b=>b.onclick=()=>addTravel(b.dataset.addTravel,b.dataset.kind)); tab.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>window.open(b.dataset.open,'_blank')); }
-function overviewHtml(t){ return `<div class="sheet-section"><h4>Kontext</h4><p class="muted">Aktive PR zeigt GPX und KML automatisch. Webcams und POIs sind PR-gebunden und werden beim PR-Wechsel gelöscht.</p><div class="card-actions"><button class="pillbtn primary" onclick="window.PRX.openTab('webcams')">Webcams</button><button class="pillbtn primary" onclick="window.PRX.openTab('pois')">POIs</button><button class="pillbtn" onclick="window.PRX.toggleSolo()">Solo</button><button class="pillbtn" onclick="window.PRX.addTrailTravel()">Zur Reise</button></div></div>${profileHtml(t)}<div class="sheet-section"><h4>Kurznotiz</h4><p class="muted">${esc(t.hint||'Keine Zusatznotiz vorhanden.')}</p></div>`; }
-function profileHtml(t){ const pts=D.tracks[t.id]||[], high=Number(t.high)||0, low=Number(t.low)||0; if(!pts.length||!high||!low||high===low) return `<div class="profile-card"><b>Höhenprofil</b><p class="muted">Keine ausreichenden Profilwerte vorhanden. Distanz ${fmtKm(t.distanceKm)}, Dauer ${fmt(t.duration)}, Schwierigkeit ${esc(t.level||'k.A.')}.</p></div>`; let d=[0], total=0; for(let i=1;i<pts.length;i++){ total+=hav(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]); d.push(total); } const w=360,h=145,pad=12; const arr=d.map((x,i)=>{ const ratio=total?x/total:i/(d.length-1||1); const wave=(Math.sin(ratio*Math.PI*1.2)+0.35*Math.sin(ratio*Math.PI*4.1)+1.35)/2.7; const elev=low+(high-low)*Math.max(0,Math.min(1,wave)); const sx=pad+ratio*(w-pad*2), sy=h-pad-((elev-low)/(high-low))*(h-pad*2); return `${sx.toFixed(1)},${sy.toFixed(1)}`; }).join(' '); return `<div class="profile-card"><b>Höhenprofil · Clean Area</b><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Höhenprofil"><defs><linearGradient id="profileFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".36"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".04"/></linearGradient></defs><g stroke="rgba(16,43,40,.12)" stroke-width="1"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}"/><line x1="${pad}" y1="${pad}" x2="${w-pad}" y2="${pad}"/></g><polygon points="${pad},${h-pad} ${arr} ${w-pad},${h-pad}" fill="url(#profileFill)"/><polyline points="${arr}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="profile-meta"><span>${fmtKm(total||t.distanceKm)}</span><span>↑ ${fmt(t.elev)} m</span><span>↓ ${Math.max(0,Math.round((high-low)-(Number(t.elev)||0)))} m</span><span>${Math.round(low)}–${Math.round(high)} m</span><span>${fmt(t.duration)}</span><span>${esc(t.level||'k.A.')}</span></div><div class="profile-note">V3.4 zeigt ein SVG-Profil. Falls GPX keine Höhenpunkte enthält, werden vorhandene Hoch-/Tiefwerte als Vorschau genutzt.</div></div>`; }
-function driveHtml(t){ const g=`https://www.google.com/maps/dir/?api=1&origin=${D.home.lat},${D.home.lon}&destination=${t.lat},${t.lon}&travelmode=driving`; return `<div class="sheet-section"><h4>Anfahrt ab ${esc(D.home.name)}</h4><p class="muted">${fmtKm(t.driveKm)} · ${fmtMin(t.driveMin)} · Ziel ${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}</p><div class="card-actions"><button class="pillbtn primary" data-open="${g}">Google Maps</button><button class="pillbtn" onclick="window.PRX.fitSelected()">Route einpassen</button></div></div>`; }
+function renderSheet(){ const id=state.selectedTrailId, t=byId[id], root=$('sheetContent'); if(!t){root.innerHTML='';return;} const fc=featureCounts(t); root.innerHTML=`<div class="sheet-head"><div class="sheet-title"><small>${esc(t.number)} · ${esc(t.region||'Madeira')} · ${statusHtml(t)}</small><h2>${esc(t.name)}</h2></div><button class="close" id="closeSheet">×</button></div>${statusSourceHtml()}<div class="seg"><button data-tab="overview">Übersicht</button><button data-tab="webcams">Webcams</button><button data-tab="pois">POIs</button><button data-tab="drive">Anfahrt</button><button data-tab="profile">Profil</button><button data-tab="links">Links</button><button data-tab="notes">Notizen</button></div><div class="facts"><div class="fact"><small>Distanz</small><b>${fmtKm(t.distanceKm)}</b></div><div class="fact"><small>Dauer</small><b>${fmt(t.duration)}</b></div><div class="fact"><small>Tunnel ≤100 m</small><b>${fc.tunnel}</b></div><div class="fact"><small>Wasserfälle ≤100 m</small><b>${fc.waterfall}</b></div></div><div class="facts facts-secondary"><div class="fact"><small>Anfahrt</small><b>${fmtMin(t.driveMin)}</b></div><div class="fact"><small>Höhenmeter</small><b>${fmt(t.elev)} m</b></div><div class="fact"><small>Feature-Quelle</small><b>${fc.sourceLabel}</b></div><div class="fact"><small>Korridor</small><b>100 m</b></div></div><div id="tabContent"></div>`; root.querySelector('#closeSheet').onclick=closeSheet; root.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===state.sheetTab); b.onclick=()=>{state.sheetTab=b.dataset.tab; renderSheet();};}); const tab=$('tabContent'); if(state.sheetTab==='overview') tab.innerHTML=overviewHtml(t); if(state.sheetTab==='profile') tab.innerHTML=profileHtml(t); if(state.sheetTab==='webcams') tab.innerHTML=contextHtml('webcam', relatedWebcams(t)); if(state.sheetTab==='pois') tab.innerHTML=contextHtml('poi', relatedPois(t)); if(state.sheetTab==='drive') tab.innerHTML=driveHtml(t); if(state.sheetTab==='links') tab.innerHTML=linksHtml(t); if(state.sheetTab==='notes') tab.innerHTML=notesHtml(t); tab.querySelectorAll('[data-focus-poi]').forEach(b=>b.onclick=()=>togglePoi(b.dataset.focusPoi)); tab.querySelectorAll('[data-focus-webcam]').forEach(b=>b.onclick=()=>toggleWebcam(b.dataset.focusWebcam)); tab.querySelectorAll('[data-add-travel]').forEach(b=>b.onclick=()=>addTravel(b.dataset.addTravel,b.dataset.kind)); tab.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>window.open(b.dataset.open,'_blank')); }
+function overviewHtml(t){ const fc=featureCounts(t); return `<div class="sheet-section"><h4>Kontext</h4><p class="muted">Aktive PR zeigt GPX und KML automatisch. Webcams und POIs sind PR-gebunden und werden beim PR-Wechsel gelöscht.</p><div class="feature-badges"><span class="feature-badge tunnel">Tunnel: ${fc.tunnel}</span><span class="feature-badge waterfall">Wasserfälle: ${fc.waterfall}</span><span class="feature-badge">Korridor: 100 m</span></div><div class="card-actions"><button class="pillbtn primary" onclick="window.PRX.openTab('webcams')">Webcams</button><button class="pillbtn primary" onclick="window.PRX.openTab('pois')">POIs</button><button class="pillbtn" onclick="window.PRX.toggleSolo()">Solo</button><button class="pillbtn" onclick="window.PRX.addTrailTravel()">Zur Reise</button></div></div>${profileHtml(t)}<div class="sheet-section"><h4>Kurznotiz</h4><p class="muted">${esc(t.hint||'Keine Zusatznotiz vorhanden.')}</p></div>`; }
+function profileHtml(t){
+  const pts=D.tracks[t.id]||[], st=(D.trackStats||{})[t.id]||{};
+  const hasEle=!!st.hasElevation && pts.some(p=>p.length>2);
+  const w=360,h=145,pad=12;
+  if(!pts.length){
+    return `<div class="profile-card"><b>Höhenprofil</b><p class="muted">Für diese PR ist keine GPX-Geometrie hinterlegt. Stammdaten: Distanz ${fmtKm(t.distanceKm)}, Dauer ${fmt(t.duration)}, Schwierigkeit ${esc(t.level||'k.A.')}.</p></div>`;
+  }
+  let d=[0], total=0;
+  for(let i=1;i<pts.length;i++){ total+=hav(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]); d.push(total); }
+  let elevs=[];
+  if(hasEle){ elevs=pts.map(p=>Number(p[2])).filter(Number.isFinite); }
+  const high=hasEle?Math.max(...elevs):(Number(t.high)||0);
+  const low=hasEle?Math.min(...elevs):(Number(t.low)||0);
+  if(!high||!low||high===low){
+    return `<div class="profile-card"><b>Höhenprofil</b><p class="muted">GPX-Track vorhanden, aber ohne verwertbare Höhendaten. Angezeigt werden Stammdaten: Distanz ${fmtKm(t.distanceKm)}, Dauer ${fmt(t.duration)}, Schwierigkeit ${esc(t.level||'k.A.')}.</p><div class="profile-note">Quelle Track: ${esc(st.sourceFile||'Projektdatei')}</div></div>`;
+  }
+  const arr=d.map((x,i)=>{
+    const ratio=total?x/total:i/(d.length-1||1);
+    const elev=hasEle?Number(pts[i][2]):(low+(high-low)*((Math.sin(ratio*Math.PI*1.15)+0.28*Math.sin(ratio*Math.PI*3.4)+1.32)/2.62));
+    const sx=pad+ratio*(w-pad*2), sy=h-pad-((elev-low)/(high-low))*(h-pad*2);
+    return `${sx.toFixed(1)},${sy.toFixed(1)}`;
+  }).join(' ');
+  const gain=hasEle?st.gainM:(Number(t.elev)||Math.max(0,high-low));
+  const loss=hasEle?st.lossM:null;
+  const sourceText=hasEle?`Echtes GPX-Höhenprofil aus ${esc(st.sourceFile||'Gpx.zip')}`:`Schematische Darstellung aus Excel-Stammdaten; GPX enthält keine Höhenwerte.`;
+  return `<div class="profile-card"><b>Höhenprofil · Clean Area</b><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${hasEle?'GPX Höhenprofil':'Schematisches Höhenprofil'}"><defs><linearGradient id="profileFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".36"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".04"/></linearGradient></defs><g stroke="rgba(16,43,40,.12)" stroke-width="1"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}"/><line x1="${pad}" y1="${pad}" x2="${w-pad}" y2="${pad}"/></g><polygon points="${pad},${h-pad} ${arr} ${w-pad},${h-pad}" fill="url(#profileFill)"/><polyline points="${arr}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="profile-meta"><span>${fmtKm(total||t.distanceKm)}</span><span>↑ ${fmt(gain)} m</span><span>↓ ${loss==null?'k.A.':fmt(loss)+' m'}</span><span>${Math.round(low)}–${Math.round(high)} m</span><span>${fmt(t.duration)}</span><span>${esc(t.level||'k.A.')}</span></div><div class="profile-note">${sourceText}</div></div>`;
+}
 function linksHtml(t){ const q=encodeURIComponent(`${t.number} ${t.name} Madeira`); const maps=`https://www.google.com/maps/search/?api=1&query=${t.lat},${t.lon}`; const links=[['google.svg','Google',`https://www.google.com/search?q=${q}`],['youtube.svg','YouTube',`https://www.youtube.com/results?search_query=${q}`],['instagram.svg','Instagram',`https://www.instagram.com/explore/search/keyword/?q=${q}`],['komoot.svg','Komoot',`https://www.komoot.com/search/${q}`],['strava.svg','Strava',`https://www.strava.com/routes/search?keywords=${q}`],['googlemaps.svg','Maps',maps]]; return `<div class="sheet-section"><h4>Plattform-Suche</h4><p class="muted">Suchbegriff wird automatisch aus aktivem PR erzeugt.</p><div class="platform-actions">${links.map(([ico,label,url])=>`<button class="platform-btn" data-open="${url}"><img src="./assets/platform/${ico}" alt="">${label}</button>`).join('')}</div></div>`; }
 function notesHtml(t){ const key=`prxNote:${t.id}`; const val=localStorage.getItem(key)||''; setTimeout(()=>{ const n=$('noteInput'); if(n) n.oninput=()=>localStorage.setItem(key,n.value); },0); return `<div class="sheet-section"><h4>Notizen</h4><textarea id="noteInput" style="width:100%;min-height:120px;border-radius:16px;border:1px solid var(--line-dark);padding:10px;font:inherit">${esc(val)}</textarea></div>`; }
-function contextHtml(kind, items){ if(!items.length) return '<p class="muted">Keine passenden Einträge im aktuellen Datenstand.</p>'; return `<div class="context-grid">${items.map(x=>{const id=esc(x.id), selected=(kind==='poi'?state.selectedPoiIds:state.selectedWebcamIds).includes(x.id); return `<div class="context-card"><div class="ct"><b>${esc(x.name)}</b><small>${esc(categoryLabel(x))} · ${distanceText(x)}</small><p>${esc(shortText(x))}</p></div><div class="context-actions"><button class="mini ${selected?'primary':''}" data-focus-${kind}="${id}">Karte</button><button class="mini" data-add-travel="${id}" data-kind="${kind}">Zur Reise</button>${x.url?`<button class="mini" data-open="${esc(x.url)}">Quelle</button>`:''}<button class="mini" data-open="${googleMapsUrl(x)}">Maps</button></div></div>`}).join('')}</div>`; }
-function categoryLabel(x){ return x.cat||x.region||'Kontext'; }
-function shortText(x){ if(x.short_de) return x.short_de; if(x.note) return x.note; return `${categoryLabel(x)} nahe der aktiven Route; Quelle öffnen für Details.`.slice(0,150); }
+function sourceBadge(x){
+  const c=(x.confidence||'mittel').toLowerCase();
+  return `<span class="source-badge ${esc(c)}">${esc(x.sourceLabel||'Quelle prüfen')}</span>`;
+}
+function iconSymbol(id){
+  const m={viewpoint:'△',sight:'◇',waterfall:'≋',tunnel:'▰',forest:'♧',beach:'≈',trailhead:'⌖',parking:'P',fuel:'F',cafe:'C',restaurant:'R',supermarket:'□',toilet:'WC',webcam:'◉',bus:'BUS',shuttle:'⇄',taxi:'TAXI',warning:'!',hotspot:'▲',poi:'•'};
+  return m[id] || m.poi;
+}
+function thumbHtml(x){
+  if(x.thumbnailUrl) return `<div class="context-thumb img"><img src="${esc(x.thumbnailUrl)}" alt="" loading="lazy"></div>`;
+  const ico=x.thumbnailIcon||x.baseIconId||x.categoryId||'poi';
+  return `<div class="context-thumb ${esc(ico)}"><span>${esc(iconSymbol(ico))}</span></div>`;
+}
+function contextHtml(kind, items){
+  if(!items.length) return `<p class="muted">Noch keine kuratierten ${kind==='poi'?'POIs':'Webcams'} zu dieser PR zugeordnet.</p>`;
+  return `<div class="context-grid">${items.map(x=>{
+    const id=esc(x.id), selected=(kind==='poi'?state.selectedPoiIds:state.selectedWebcamIds).includes(x.id);
+    return `<div class="context-card ${esc(x.categoryId||'poi')}">${thumbHtml(x)}<div class="ct"><b>${esc(x.name)}</b><small>${esc(categoryLabel(x))} · ${distanceText(x)}</small><p>${esc(shortText(x))}</p><div class="context-source">${sourceBadge(x)}</div></div><div class="context-actions"><button class="mini ${selected?'primary':''}" data-focus-${kind}="${id}">Karte</button><button class="mini" data-add-travel="${id}" data-kind="${kind}">Zur Reise</button>${(x.sourceUrl||x.url)?`<button class="mini" data-open="${esc(x.sourceUrl||x.url)}">Quelle</button>`:''}<button class="mini" data-open="${googleMapsUrl(x)}">Maps</button></div></div>`;
+  }).join('')}</div>`;
+}
+function categoryLabel(x){ return x.categoryLabel||x.cat||x.region||'Kontext'; }
+function shortText(x){ const s=x.short_de||x.note||`${categoryLabel(x)} nahe der aktiven Route; Quelle öffnen für Details.`; return String(s).slice(0,150); }
 function googleMapsUrl(x){ const [lat,lon]=ll(x); return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
 function distanceText(x){ const t=byId[state.selectedTrailId], [lat,lon]=ll(x); return t?`${hav(t.lat,t.lon,lat,lon).toFixed(1).replace('.',',')} km`:'–'; }
-function relatedPois(t){ return [...(D.pois||[])].map(p=>({...p, categoryId:p.categoryId||String(p.cat||'poi').toLowerCase(), baseIconId:p.baseIconId||'poi'})).sort((a,b)=>hav(t.lat,t.lon,...ll(a))-hav(t.lat,t.lon,...ll(b))).slice(0,8); }
-function relatedWebcams(t){ return [...(D.webcams||[])].map(p=>({...p, categoryId:'webcam', baseIconId:'webcam'})).sort((a,b)=>hav(t.lat,t.lon,...ll(a))-hav(t.lat,t.lon,...ll(b))).slice(0,5); }
+
+function xyKm(lat, lon, refLat){ const R=6371; const rad=Math.PI/180; return [R*lon*rad*Math.cos(refLat*rad), R*lat*rad]; }
+function pointSegmentDistanceKm(p, a, b){
+  const ref=(a[0]+b[0]+p[0])/3; const P=xyKm(p[0],p[1],ref), A=xyKm(a[0],a[1],ref), B=xyKm(b[0],b[1],ref);
+  const vx=B[0]-A[0], vy=B[1]-A[1], wx=P[0]-A[0], wy=P[1]-A[1];
+  const c=vx*vx+vy*vy; const t=c?Math.max(0,Math.min(1,(wx*vx+wy*vy)/c)):0;
+  const x=A[0]+t*vx, y=A[1]+t*vy; return Math.hypot(P[0]-x,P[1]-y);
+}
+function distanceToGeometryKm(point, geom){
+  if(!geom || geom.length<2) return Infinity;
+  const p=[point.lat, point.lng ?? point.lon]; let best=Infinity;
+  for(let i=1;i<geom.length;i++){ const d=pointSegmentDistanceKm(p, geom[i-1], geom[i]); if(d<best) best=d; }
+  return best;
+}
+function featureMatchesRoute(t,p){
+  if(!(p.relatedPrIds||[]).includes(t.id)) return false;
+  if(p.countInRouteFeatureSummary===true) return true;
+  const trail=D.tracks[t.id]||[], drive=D.drives[t.id]||[];
+  const dTrail=distanceToGeometryKm(p, trail);
+  const dDrive=distanceToGeometryKm(p, drive);
+  return Math.min(dTrail,dDrive) <= FEATURE_CORRIDOR_KM;
+}
+function featureCounts(t){
+  const out={tunnel:0, waterfall:0, sourceLabel:'OSM/PRX'};
+  const seen={tunnel:new Set(), waterfall:new Set()};
+  (D.pois||[]).filter(p=>['tunnel','waterfall'].includes(p.categoryId)).forEach(p=>{
+    if(featureMatchesRoute(t,p) && !seen[p.categoryId].has(p.id)){ seen[p.categoryId].add(p.id); out[p.categoryId]++; }
+  });
+  if(out.tunnel+out.waterfall===0) out.sourceLabel='keine Treffer';
+  else out.sourceLabel='POI/OSM Seed';
+  return out;
+}
+
+function relatedScore(t,p){
+  const rel=(p.relatedPrIds||[]).includes(t.id) ? -1000 : 0;
+  return rel + hav(t.lat,t.lon,...ll(p));
+}
+function relatedPois(t){
+  const all=(D.pois||[]).filter(p=>!p.hidden && !p.archived).map(p=>({...p, categoryId:p.categoryId||String(p.cat||'poi').toLowerCase(), baseIconId:p.baseIconId||p.categoryId||'poi'}));
+  const directly=all.filter(p=>(p.relatedPrIds||[]).includes(t.id));
+  const pool=directly.length?directly:all;
+  return pool.sort((a,b)=>relatedScore(t,a)-relatedScore(t,b)).slice(0,12);
+}
+function relatedWebcams(t){ return [...(D.webcams||[])].map(p=>({...p, categoryId:'webcam', baseIconId:'webcam', categoryLabel:'Webcam', confidence:p.confidence||'mittel', sourceLabel:p.sourceLabel||'NetMadeira / Webcam-Link'})).sort((a,b)=>hav(t.lat,t.lon,...ll(a))-hav(t.lat,t.lon,...ll(b))).slice(0,5); }
 function togglePoi(id){ toggleId(state.selectedPoiIds,id); state.layers.context=true; renderContextMarkers(); renderSheet(); updateControls(); }
 function toggleWebcam(id){ toggleId(state.selectedWebcamIds,id); state.layers.context=true; renderContextMarkers(); renderSheet(); updateControls(); }
 function toggleId(arr,id){ const i=arr.indexOf(id); i>=0?arr.splice(i,1):arr.push(id); }
-function renderContextMarkers(){ if(!layers.context) return; layers.context.clearLayers(); layers.highlight.clearLayers(); const poiIcon=L.divIcon({className:'',html:'<div class="context-marker">⌾</div>',iconSize:[30,30],iconAnchor:[15,15]}); const camIcon=L.divIcon({className:'',html:'<div class="context-marker webcam-marker">◉</div>',iconSize:[30,30],iconAnchor:[15,15]}); const showPois=(D.pois||[]).filter(p=>state.selectedPoiIds.includes(p.id)); const showCams=(D.webcams||[]).filter(p=>state.selectedWebcamIds.includes(p.id)); showPois.forEach(p=>L.marker(ll(p),{icon:poiIcon,title:p.name,zIndexOffset:350}).bindPopup(`<b>${esc(p.name)}</b><br>${esc(categoryLabel(p))}<br><button onclick="window.open('${googleMapsUrl(p)}','_blank')">Google Maps</button>`).addTo(layers.context)); showCams.forEach(p=>L.marker(ll(p),{icon:camIcon,title:p.name,zIndexOffset:360}).bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.note||'Webcam')}<br><button onclick="window.open('${googleMapsUrl(p)}','_blank')">Google Maps</button>`).addTo(layers.context)); [...showPois,...showCams].forEach(p=>L.circleMarker(ll(p),{radius:17,color:'var(--accent)',weight:2,fill:false,opacity:.65}).addTo(layers.highlight)); }
+function contextMarkerIcon(x, cls=''){
+  const ico=x.baseIconId||x.categoryId||'poi';
+  return L.divIcon({className:'',html:`<div class="context-marker ${esc(ico)} ${cls}"><span>${esc(iconSymbol(ico))}</span></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+}
+function renderContextMarkers(){ if(!map) return; /* lazy-map guard renderContextMarkers */
+  if(!layers.context) return;
+  layers.context.clearLayers(); layers.highlight.clearLayers();
+  const showPois=(D.pois||[]).filter(p=>state.selectedPoiIds.includes(p.id));
+  const showCams=(D.webcams||[]).filter(p=>state.selectedWebcamIds.includes(p.id)).map(p=>({...p,baseIconId:'webcam',categoryId:'webcam',categoryLabel:'Webcam'}));
+  showPois.forEach(p=>L.marker(ll(p),{icon:contextMarkerIcon(p),title:p.name,zIndexOffset:350}).bindPopup(`<b>${esc(p.name)}</b><br>${esc(categoryLabel(p))}<br>${esc(shortText(p))}<br><button onclick="window.open('${googleMapsUrl(p)}','_blank')">Google Maps</button>`).addTo(layers.context));
+  showCams.forEach(p=>L.marker(ll(p),{icon:contextMarkerIcon(p,'webcam-marker'),title:p.name,zIndexOffset:360}).bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.note||'Webcam')}<br><button onclick="window.open('${googleMapsUrl(p)}','_blank')">Google Maps</button>`).addTo(layers.context));
+  [...showPois,...showCams].forEach(p=>L.circleMarker(ll(p),{radius:17,color:'var(--accent)',weight:2,fill:false,opacity:.65}).addTo(layers.highlight));
+}
 
 function addTravel(id, kind){ const src=kind==='poi'?(D.pois||[]):kind==='webcam'?(D.webcams||[]):trails; const x=src.find(a=>a.id===id); if(!x) return; const key=`${kind}:${id}`; state.hiddenTravel=state.hiddenTravel.filter(k=>k!==key); if(!state.travel.find(e=>e.id===id&&e.kind===kind)){ state.travel.push({id,kind,name:x.name||x.number||id,trail:state.selectedTrailId,addedBy:'Admin',addedAt:new Date().toISOString(),source:kind==='trail'?'PRX':'context',reasonNote:''}); } saveState(); renderTravel(); renderCarousel(); renderMap(); renderSheet(); toast('Zur Reise-Sammlung hinzugefügt'); }
 function hideTravel(i){ const e=state.travel[i]; if(!e) return; const key=`${e.kind}:${e.id}`; if(!state.hiddenTravel.includes(key)) state.hiddenTravel.push(key); saveState(); renderTravel(); renderCarousel(); renderMap(); toast('Eintrag ausgeblendet, nicht gelöscht'); }
 function restoreHidden(){ state.hiddenTravel=[]; saveState(); renderTravel(); renderCarousel(); renderMap(); toast('Ausgeblendete Einträge wieder sichtbar'); }
-function renderTravel(){ const root=$('travelList'); if(!state.travel.length){root.innerHTML='<div class="muted">Noch keine PRs, Webcams oder Sehenswürdigkeiten gesammelt.</div>';return;} root.innerHTML=state.travel.map((e,i)=>{const hidden=state.hiddenTravel.includes(`${e.kind}:${e.id}`); return `<div class="travel-item ${hidden?'archived':''}"><b>${esc(e.name)}</b><small>${esc(e.kind)}${e.trail?' · Kontext '+esc(e.trail):''} · ${hidden?'ausgeblendet':'sichtbar'}</small><button class="mini" data-hide="${i}">${hidden?'Bleibt archiviert':'Ausblenden'}</button></div>`;}).join('')+`<button class="wide-btn" id="restoreHidden">Ausgeblendete Einträge wieder einblenden</button>`; root.querySelectorAll('[data-hide]').forEach(b=>b.onclick=()=>hideTravel(+b.dataset.hide)); const r=$('restoreHidden'); if(r) r.onclick=restoreHidden; }
+function renderTravel(){ const root=$('travelList'); const start=$('travelStart'), end=$('travelEnd'), hint=$('travelDateHint'); if(start) start.value=state.tripDates.start||''; if(end) end.value=state.tripDates.end||''; if(hint) hint.textContent=(state.tripDates.start&&state.tripDates.end)?`Reisezeitraum: ${state.tripDates.start} bis ${state.tripDates.end}`:'Reisezeitraum noch nicht festgelegt.'; if(!state.travel.length){root.innerHTML='<div class="muted">Noch keine PRs, Webcams oder Sehenswürdigkeiten gesammelt.</div>';return;} root.innerHTML=state.travel.map((e,i)=>{const hidden=state.hiddenTravel.includes(`${e.kind}:${e.id}`); return `<div class="travel-item ${hidden?'archived':''}"><b>${esc(e.name)}</b><small>${esc(e.kind)}${e.trail?' · Kontext '+esc(e.trail):''} · ${hidden?'ausgeblendet':'sichtbar'}</small><button class="mini" data-hide="${i}">${hidden?'Bleibt archiviert':'Ausblenden'}</button></div>`;}).join('')+`<button class="wide-btn" id="restoreHidden">Ausgeblendete Einträge wieder einblenden</button>`; root.querySelectorAll('[data-hide]').forEach(b=>b.onclick=()=>hideTravel(+b.dataset.hide)); const r=$('restoreHidden'); if(r) r.onclick=restoreHidden; }
 
 function renderJournal(){ const root=$('journalList'); const list=state.routeType==='collected'?filtered.filter(t=>isCollected(t.id,'trail')):(state.routeType==='external_route'?[]:filtered); $('journalCount').textContent=`${list.length} Treffer`; root.innerHTML=list.map(t=>`<button class="journal-item" data-id="${esc(t.id)}"><b>${esc(t.number)} · ${esc(t.name)}</b><small>${esc(t.region)} · ${fmtKm(t.distanceKm)} · ${fmtMin(t.driveMin)} · ${esc(t.level||'k.A.')} · ${trailStatus(t).label}${isCollected(t.id,'trail')?' · gesammelt':''}</small></button>`).join('') || '<div class="muted">Keine Treffer.</div>'; root.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>{setMode('map');selectTrail(b.dataset.id,{fromJournal:true});}); }
 function renderDashboard(){ const root=$('dashboardContent'); if(!root) return; const counts={open:0,limited:0,closed:0,unknown:0}; trails.forEach(t=>counts[trailStatus(t).key]++); root.innerHTML=`<div class="dash-card"><small>PR gesamt</small><b>${trails.length}</b></div><div class="dash-card"><small>Offen</small><b>${counts.open}</b></div><div class="dash-card"><small>Eingeschränkt</small><b>${counts.limited}</b></div><div class="dash-card"><small>Gesperrt</small><b>${counts.closed}</b></div><div class="dash-card"><small>Favoriten</small><b>${state.favs.size}</b></div><div class="dash-card"><small>Reise-Sammlung</small><b>${state.travel.length-state.hiddenTravel.length}</b></div>`; }
-function setMode(mode){ state.mode=mode; document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode)); $('journal').classList.toggle('hidden',mode!=='journal'); $('travelPanel').classList.toggle('hidden',mode!=='travel'); $('dashboard').classList.toggle('hidden',mode!=='dashboard'); if(mode==='journal') renderJournal(); if(mode==='travel') renderTravel(); if(mode==='dashboard') renderDashboard(); setTimeout(()=>map?.invalidateSize(),80); }
-function updateControls(){ document.querySelectorAll('[data-base]').forEach(b=>b.classList.toggle('active',b.dataset.base===state.base)); document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.layer])); document.querySelectorAll('[data-quick-base]').forEach(b=>b.classList.toggle('active',b.dataset.quickBase===state.base)); document.querySelectorAll('[data-quick-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.quickLayer])); document.querySelectorAll('[data-route-type]').forEach(b=>b.classList.toggle('active',b.dataset.routeType===state.routeType)); const d=$('diagnosticBox'); if(d) d.innerHTML=`V3.4 · PR ${trails.length} · gefiltert ${filtered.length} · aktiv ${state.selectedTrailId||'–'} · Theme ${state.settings.theme}`; }
+function setMode(mode){ if(mode==='map' && !prxLazyMapStarted) prxEnsureMapStarted('mode-map'); state.mode=mode; document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode)); $('journal').classList.toggle('hidden',mode!=='journal'); $('travelPanel').classList.toggle('hidden',mode!=='travel'); $('dashboard').classList.toggle('hidden',mode!=='dashboard'); if(mode==='journal') renderJournal(); if(mode==='travel') renderTravel(); if(mode==='dashboard') renderDashboard(); setTimeout(()=>map?.invalidateSize(),80); }
+function updateControls(){ document.querySelectorAll('[data-base]').forEach(b=>b.classList.toggle('active',b.dataset.base===state.base)); document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.layer])); document.querySelectorAll('[data-quick-base]').forEach(b=>b.classList.toggle('active',b.dataset.quickBase===state.base)); document.querySelectorAll('[data-quick-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.quickLayer])); document.querySelectorAll('[data-route-type]').forEach(b=>b.classList.toggle('active',b.dataset.routeType===state.routeType)); const d=$('diagnosticBox'); if(d) d.innerHTML=`V3.4.8 · PR ${trails.length} · gefiltert ${filtered.length} · aktiv ${state.selectedTrailId||'–'} · Theme ${state.settings.theme}`; }
 
 function bind(){
-  $('fitBtn').onclick=fitAll; $('locateBtn').onclick=()=>map.locate({setView:true,maxZoom:14}); $('layerBtn').onclick=()=>$('layerPanel').classList.toggle('hidden'); $('closeLayers').onclick=()=>$('layerPanel').classList.add('hidden'); $('settingsBtn').onclick=()=>$('settingsPanel').classList.remove('hidden'); $('closeSettings').onclick=()=>$('settingsPanel').classList.add('hidden'); $('searchBtn').onclick=()=>$('searchPanel').classList.toggle('hidden'); $('closeSearch').onclick=()=>$('searchPanel').classList.add('hidden'); $('closeTravel').onclick=()=>setMode('map'); $('closeDashboard').onclick=()=>setMode('map'); $('closeCarousel').onclick=hideCarousel;
-  $('searchInput').oninput=e=>{state.query=e.target.value; applyFilters();};
+  $('fitBtn').onclick=()=>state.selectedTrailId?centerTrail(state.selectedTrailId,true):fitAll(); $('locateBtn').onclick=()=>map.locate({setView:true,maxZoom:14}); $('layerBtn').onclick=()=>$('layerPanel').classList.toggle('hidden'); $('closeLayers').onclick=()=>$('layerPanel').classList.add('hidden'); $('settingsBtn').onclick=()=>$('settingsPanel').classList.remove('hidden'); $('closeSettings').onclick=()=>$('settingsPanel').classList.add('hidden'); $('searchBtn').onclick=()=>$('searchPanel').classList.toggle('hidden'); $('closeSearch').onclick=()=>$('searchPanel').classList.add('hidden'); $('closeTravel').onclick=()=>setMode('map'); $('closeDashboard').onclick=()=>setMode('map'); $('closeCarousel').onclick=hideCarousel;
+  $('searchInput').oninput=e=>{state.query=e.target.value; applyFilters();}; const rf=$('resetFiltersBtn'); if(rf) rf.onclick=resetFilters; ['travelStart','travelEnd'].forEach(id=>{const el=$(id); if(el) el.onchange=e=>{state.tripDates[id==='travelStart'?'start':'end']=e.target.value; saveState(); renderTravel(); toast('Reisezeitraum gespeichert');};});
   document.querySelectorAll('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
   document.querySelectorAll('[data-base]').forEach(b=>b.onclick=()=>setBase(b.dataset.base));
   document.querySelectorAll('[data-layer]').forEach(b=>b.onclick=()=>{state.layers[b.dataset.layer]=!state.layers[b.dataset.layer]; renderMap();});
   document.querySelectorAll('[data-quick-base]').forEach(b=>b.onclick=()=>setBase(b.dataset.quickBase));
   document.querySelectorAll('[data-quick-layer]').forEach(b=>b.onclick=()=>{state.layers[b.dataset.quickLayer]=!state.layers[b.dataset.quickLayer]; renderMap();});
   document.querySelectorAll('[data-route-type]').forEach(b=>b.onclick=()=>{state.routeType=b.dataset.routeType; renderJournal(); updateControls();});
-  document.querySelectorAll('.filter-chip[data-filter="level"]').forEach(b=>b.onclick=()=>{state.level=b.dataset.value;document.querySelectorAll('.filter-chip[data-filter="level"]').forEach(x=>x.classList.toggle('active',x===b));applyFilters();});
+  document.querySelectorAll('.filter-chip[data-filter="level"]').forEach(b=>b.onclick=()=>{if(b.dataset.value==='all'){resetFilters();return;} state.level=b.dataset.value;document.querySelectorAll('.filter-chip[data-filter="level"]').forEach(x=>x.classList.toggle('active',x===b));applyFilters();});
   document.querySelectorAll('.filter-chip[data-filter="status"]').forEach(b=>b.onclick=()=>{state.statusFilter=state.statusFilter===b.dataset.value?'all':b.dataset.value;document.querySelectorAll('.filter-chip[data-filter="status"]').forEach(x=>x.classList.toggle('active',state.statusFilter===x.dataset.value));applyFilters();});
   document.querySelector('[data-filter="fav"]').onclick=e=>{state.onlyFav=!state.onlyFav;e.currentTarget.classList.toggle('active',state.onlyFav);applyFilters();};
   document.querySelector('[data-filter="collected"]').onclick=e=>{state.onlyCollected=!state.onlyCollected;e.currentTarget.classList.toggle('active',state.onlyCollected);applyFilters();};
@@ -159,7 +302,49 @@ function bind(){
 }
 function bindSheetDrag(){ const sh=$('detailSheet'), grip=$('sheetGrip'); let startY=0,dy=0,drag=false; grip.addEventListener('pointerdown',e=>{drag=true;startY=e.clientY;dy=0;sh.classList.add('dragging');grip.setPointerCapture(e.pointerId);}); grip.addEventListener('pointermove',e=>{if(!drag)return;dy=e.clientY-startY;if(dy>0)sh.style.transform=`translateY(${dy}px)`;}); grip.addEventListener('pointerup',e=>{if(!drag)return;drag=false;sh.classList.remove('dragging');try{grip.releasePointerCapture(e.pointerId)}catch{}; if(dy>90)closeSheet(); else sh.style.transform='translateY(0px)';}); grip.addEventListener('pointercancel',()=>{drag=false;sh.classList.remove('dragging');sh.style.transform='translateY(0px)';}); }
 function bindCarouselDrag(){ const shell=$('carouselShell'); let startY=0,startX=0,dy=0,dx=0,drag=false,vertical=false; shell.addEventListener('pointerdown',e=>{if(!state.selectedTrailId||e.target.closest('button'))return; drag=true; vertical=false; startY=e.clientY; startX=e.clientX; dy=dx=0; try{shell.setPointerCapture(e.pointerId)}catch{};}); shell.addEventListener('pointermove',e=>{if(!drag)return;dy=e.clientY-startY;dx=e.clientX-startX;if(!vertical&&Math.abs(dy)>16&&Math.abs(dy)>Math.abs(dx)*1.15)vertical=true;if(vertical)e.preventDefault();},{passive:false}); shell.addEventListener('pointerup',e=>{if(!drag)return;drag=false;try{shell.releasePointerCapture(e.pointerId)}catch{}; if(!vertical)return; if(dy<-54)openSheet('overview'); else if(dy>72){hideCarousel();toast('PR-Karussell ausgeblendet');}}); shell.addEventListener('pointercancel',()=>{drag=false;vertical=false;}); }
+
+function prxEnsureMapStarted(reason){
+  if(prxLazyMapStarted){
+    stableInvalidateMap(reason || 'lazy-existing');
+    return;
+  }
+  prxLazyMapStarted = true;
+  initMap();
+  stableInvalidateMap(reason || 'lazy-init');
+  applyFilters();
+  updateControls();
+  fitAll();
+}
+
+function prxEnterFromIntro(){
+  const intro = $('introScreen');
+  if(intro) intro.classList.add('hidden');
+  document.body.classList.remove('intro-active');
+  prxEnsureMapStarted('intro-start');
+  setMode('map');
+}
+
+function prxBindIntro(){
+  document.body.classList.add('intro-active');
+  const btn = $('introStartBtn');
+  if(btn) btn.addEventListener('click', prxEnterFromIntro, {passive:true});
+}
+
 window.PRX={ openTab(tab){openSheet(tab);}, addTrailTravel(){if(state.selectedTrailId)addTravel(state.selectedTrailId,'trail');}, fitSelected(){if(state.selectedTrailId)centerTrail(state.selectedTrailId,true);}, toggleSolo(){toggleSolo();} };
-function boot(){ applyVisualSettings(); initMap(); bind(); applyFilters(); renderDashboard(); updateControls(); fitAll(); if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); }
+function boot(){
+  updateSafeAreaVars();
+  applyVisualSettings();
+  bind();
+  prxBindIntro();
+  renderDashboard();
+  renderTravel();
+  updateControls();
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  window.addEventListener('resize', function(){ updateSafeAreaVars(); stableInvalidateMap('resize'); });
+  window.addEventListener('orientationchange', function(){ updateSafeAreaVars(); stableInvalidateMap('orientationchange'); });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', function(){ updateSafeAreaVars(); stableInvalidateMap('visualViewport.resize'); });
+  }
+}
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();

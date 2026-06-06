@@ -1,0 +1,11 @@
+PR-Explorer V3.4.8 FULLSCREEN SAFEAREA LAZY INIT
+
+Zweck:
+- Karte läuft fullscreen unter der Modebar bis an den Displayrand.
+- Modebar schützt ihren Inhalt über env(safe-area-inset-bottom).
+- V3.4.7 Intro + Lazy Map Init bleibt erhalten.
+- Leaflet fitBounds erhält Bottom-Padding, damit Routen nicht hinter der Modebar verschwinden.
+- invalidateSize bleibt gestaffelt.
+
+Test-URL:
+https://mkbastellkram.github.io/PR-Explorer-Madeira_v3.4/index.html?v=3.4.8

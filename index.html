@@ -2,8 +2,9 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>PR Explorer Madeira · V3.4.9</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+  <title>PR Explorer Madeira · V3.4.8</title>
   <meta name="theme-color" content="#06211e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,19 +15,29 @@
 </head>
 <body data-theme="madeira_deep_forest" data-glass="light" data-icon-size="medium">
 <div id="app">
+  <section id="introScreen" class="intro-screen" aria-label="PR Explorer Start">
+    <div class="intro-card">
+      <div class="intro-kicker">MADEIRA · JUNI 2026</div>
+      <h1>PR Explorer</h1>
+      <p>Startpuffer für iOS: Die Karte wird erst nach dem Antippen geladen, damit der Displayrand stabil gesetzt ist.</p>
+      <button id="introStartBtn" class="intro-start" type="button">Los geht’s →</button>
+      <small>V3.4.8 · Intro + Lazy Map Init</small>
+    </div>
+  </section>
+
   <div id="map" aria-label="Madeira Karte"></div>
 
   <header class="topbar">
     <div class="brand">
       <span>MADEIRA</span>
       <strong>PR Explorer</strong>
-      <em>V3.4.9</em>
+      <em>V3.4.8</em>
     </div>
     <div class="top-actions">
-      <button id="locateBtn" class="glass-btn" title="Standort">⌖</button>
-      <button id="fitBtn" class="glass-btn" title="Karte einpassen">⛶</button>
-      <button id="layerBtn" class="glass-btn" title="Layer">▧</button>
-      <button id="settingsBtn" class="glass-btn" title="Einstellungen">⚙</button>
+      <button id="locateBtn" class="glass-btn" title="Standort"><span class="cu cu-location"></span></button>
+      <button id="fitBtn" class="glass-btn" title="Karte einpassen"><span class="cu cu-fit"></span></button>
+      <button id="layerBtn" class="glass-btn" title="Layer"><span class="cu cu-layers"></span></button>
+      <button id="settingsBtn" class="glass-btn" title="Einstellungen"><span class="cu cu-gear"></span></button>
     </div>
   </header>
 
@@ -49,6 +60,7 @@
     <button class="filter-chip" data-filter="status" data-value="open">● Offen</button>
     <button class="filter-chip" data-filter="status" data-value="limited">● Eingeschränkt</button>
     <button class="filter-chip" data-filter="status" data-value="closed">● Gesperrt</button>
+    <button class="filter-chip" id="resetFiltersBtn">Alle PR</button>
     <button class="filter-chip" id="searchBtn">Suchen</button>
   </section>
 
@@ -81,10 +93,10 @@
   </aside>
 
   <nav class="modebar" aria-label="Hauptnavigation">
-    <button class="mode active" data-mode="map"><span>⌖</span>Karte</button>
-    <button class="mode" data-mode="journal"><span>☰</span>Journal</button>
-    <button class="mode" data-mode="travel"><span>◇</span>Reise</button>
-    <button class="mode" data-mode="dashboard"><span>▦</span>Dashboard</button>
+    <button class="mode active" data-mode="map"><span class="cu cu-map"></span>Karte</button>
+    <button class="mode" data-mode="journal"><span class="cu cu-list"></span>Journal</button>
+    <button class="mode" data-mode="travel"><span class="cu cu-trip"></span>Reise</button>
+    <button class="mode" data-mode="dashboard"><span class="cu cu-grid"></span>Dashboard</button>
   </nav>
 
   <section class="journal hidden" id="journal">
@@ -96,6 +108,11 @@
   <section class="travel-panel hidden" id="travelPanel">
     <div class="panel-head"><strong>Reise-Sammlung</strong><button id="closeTravel">×</button></div>
     <div class="muted">V3.4 sammelt PRs und POIs. Tagesplanung und Teilnehmer folgen später.</div>
+    <div class="travel-dates">
+      <label>Reisebeginn <input id="travelStart" type="date"></label>
+      <label>Reiseende <input id="travelEnd" type="date"></label>
+    </div>
+    <div id="travelDateHint" class="muted"></div>
     <div id="travelList" class="travel-list"></div>
   </section>
 
@@ -118,10 +135,10 @@
   <section class="settings-panel hidden" id="settingsPanel">
     <div class="panel-head"><strong>Einstellungen</strong><button id="closeSettings">×</button></div>
     <div class="settings-grid">
-      <button class="settings-card" data-open-layers>▧<span>Karten & Layer</span><small>Basiskarte, OSM Hiking, GPX, KML, POI/Webcams</small></button>
-      <button class="settings-card" data-fit-selected>⛶<span>Aktive PR einpassen</span><small>GPX + KML der aktiven PR</small></button>
-      <button class="settings-card" data-reset-view>⌖<span>Gesamtkarte</span><small>Alle gefilterten PRs anzeigen</small></button>
-      <button class="settings-card" data-clear-selection>×<span>Auswahl lösen</span><small>Karussell und Kontextmarker ausblenden</small></button>
+      <button class="settings-card" data-open-layers><span class="cu cu-layers"></span><span>Karten & Layer</span><small>Basiskarte, OSM Hiking, GPX, KML, POI/Webcams</small></button>
+      <button class="settings-card" data-fit-selected><span class="cu cu-fit"></span><span>Aktive PR einpassen</span><small>GPX + KML der aktiven PR</small></button>
+      <button class="settings-card" data-reset-view><span class="cu cu-map"></span><span>Gesamtkarte</span><small>Alle gefilterten PRs anzeigen</small></button>
+      <button class="settings-card" data-clear-selection><span class="cu cu-close"></span><span>Auswahl lösen</span><small>Karussell und Kontextmarker ausblenden</small></button>
     </div>
     <h4>Darstellung</h4>
     <div class="settings-row"><label>Theme <select id="themeSelect"><option value="madeira_deep_forest">Madeira Deep Forest</option><option value="atlantic_teal">Atlantic Teal</option><option value="volcanic_graphite">Volcanic Graphite</option><option value="laurel_light">Laurel Light</option><option value="sunrise_canyon">Sunrise Canyon</option></select></label></div>
