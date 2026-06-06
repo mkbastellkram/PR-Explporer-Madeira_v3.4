@@ -1,0 +1,15 @@
+PR-Explorer V3.4.5C SAFEAREA STYLE PATCH
+
+Zweck:
+- Nur style.css wurde durch die hochgeladene Safe-Area-Korrektur ersetzt.
+- index.html bleibt HTML.
+- app.js bleibt JavaScript.
+- data.js bleibt Datenbestand.
+
+Kontrolle:
+- index.html muss mit <!doctype html> beginnen.
+- app.js darf mit (() => beginnen.
+- style.css enthält Safe-Area-Fix mit .modebar und #map.
+
+Test-URL:
+https://mkbastellkram.github.io/PR-Explorer-Madeira_v3.4/index.html?v=3.4.5c
