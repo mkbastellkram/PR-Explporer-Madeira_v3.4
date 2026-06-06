@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>PR Explorer Madeira · V3.4.5d</title>
+  <title>PR Explorer Madeira · V3.4.6</title>
   <meta name="theme-color" content="#06211e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,13 +14,23 @@
 </head>
 <body data-theme="madeira_deep_forest" data-glass="light" data-icon-size="medium">
 <div id="app">
+  <section id="introScreen" class="intro-screen" aria-label="PR Explorer Start">
+    <div class="intro-card">
+      <div class="intro-kicker">MADEIRA · JUNI 2026</div>
+      <h1>PR Explorer</h1>
+      <p>Einfacher Startpuffer: Die Karte wird erst nach dem Antippen geladen, damit iOS den Displayrand stabil setzen kann.</p>
+      <button id="introStartBtn" class="intro-start">Los geht’s →</button>
+      <small>V3.4.6 · Intro + Lazy Map Init</small>
+    </div>
+  </section>
+
   <div id="map" aria-label="Madeira Karte"></div>
 
   <header class="topbar">
     <div class="brand">
       <span>MADEIRA</span>
       <strong>PR Explorer</strong>
-      <em>V3.4.5d</em>
+      <em>V3.4.6</em>
     </div>
     <div class="top-actions">
       <button id="locateBtn" class="glass-btn" title="Standort"><span class="cu cu-location"></span></button>

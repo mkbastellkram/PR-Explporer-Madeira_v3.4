@@ -1,5 +1,6 @@
 (() => {
 'use strict';
+  let prxLazyMapStarted = false;
   function stableInvalidateMap(reason){
     if(!state || !state.map) return;
     [80, 400, 900].forEach(function(ms){
@@ -95,7 +96,8 @@ function syncOverlayLayers(){
   if(overlays.hiking){ const on=map.hasLayer(overlays.hiking); if(state.layers.hiking && !on) overlays.hiking.addTo(map); if(!state.layers.hiking && on) map.removeLayer(overlays.hiking); }
 }
 function setBase(base){ if(activeBase) map.removeLayer(activeBase); state.base=base; activeBase=bases[base].addTo(map); updateControls(); }
-function fitAll(){ const pts=(state.selectedTrailId&&state.solo)?selectedBoundsPoints():filtered.map(t=>[t.lat,t.lon]); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,210],maxZoom:14}); setTimeout(()=>map.invalidateSize(),80); }
+function fitAll(){
+    if(!state.map) return; /* lazy-map guard fitAll */ const pts=(state.selectedTrailId&&state.solo)?selectedBoundsPoints():filtered.map(t=>[t.lat,t.lon]); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,210],maxZoom:14}); setTimeout(()=>map.invalidateSize(),80); }
 function selectedBoundsPoints(){ const id=state.selectedTrailId, t=byId[id]; return [[t.lat,t.lon],...(D.tracks[id]||[]),...(D.drives[id]||[])]; }
 function centerTrail(id, fit=false){ const t=byId[id]; if(!t||!map) return; if(fit){ const pts=selectedBoundsPoints(); if(pts.length) map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[30,150],paddingBottomRight:[30,210],maxZoom:14}); } else map.panTo([t.lat,t.lon],{animate:true,duration:.45}); setTimeout(()=>map.invalidateSize(),80); }
 function activeBoundsMostlyVisible(id){ if(!map||!id) return true; const pts=selectedBoundsPoints(); if(!pts.length) return true; const b=L.latLngBounds(pts), mb=map.getBounds(); return mb.intersects(b) && mb.contains(b.getCenter()); }
@@ -237,6 +239,7 @@ function contextMarkerIcon(x, cls=''){
   return L.divIcon({className:'',html:`<div class="context-marker ${esc(ico)} ${cls}"><span>${esc(iconSymbol(ico))}</span></div>`,iconSize:[32,32],iconAnchor:[16,16]});
 }
 function renderContextMarkers(){
+    if(!state.map) return; /* lazy-map guard renderContextMarkers */
   if(!layers.context) return;
   layers.context.clearLayers(); layers.highlight.clearLayers();
   const showPois=(D.pois||[]).filter(p=>state.selectedPoiIds.includes(p.id));
@@ -253,8 +256,9 @@ function renderTravel(){ const root=$('travelList'); const start=$('travelStart'
 
 function renderJournal(){ const root=$('journalList'); const list=state.routeType==='collected'?filtered.filter(t=>isCollected(t.id,'trail')):(state.routeType==='external_route'?[]:filtered); $('journalCount').textContent=`${list.length} Treffer`; root.innerHTML=list.map(t=>`<button class="journal-item" data-id="${esc(t.id)}"><b>${esc(t.number)} · ${esc(t.name)}</b><small>${esc(t.region)} · ${fmtKm(t.distanceKm)} · ${fmtMin(t.driveMin)} · ${esc(t.level||'k.A.')} · ${trailStatus(t).label}${isCollected(t.id,'trail')?' · gesammelt':''}</small></button>`).join('') || '<div class="muted">Keine Treffer.</div>'; root.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>{setMode('map');selectTrail(b.dataset.id,{fromJournal:true});}); }
 function renderDashboard(){ const root=$('dashboardContent'); if(!root) return; const counts={open:0,limited:0,closed:0,unknown:0}; trails.forEach(t=>counts[trailStatus(t).key]++); root.innerHTML=`<div class="dash-card"><small>PR gesamt</small><b>${trails.length}</b></div><div class="dash-card"><small>Offen</small><b>${counts.open}</b></div><div class="dash-card"><small>Eingeschränkt</small><b>${counts.limited}</b></div><div class="dash-card"><small>Gesperrt</small><b>${counts.closed}</b></div><div class="dash-card"><small>Favoriten</small><b>${state.favs.size}</b></div><div class="dash-card"><small>Reise-Sammlung</small><b>${state.travel.length-state.hiddenTravel.length}</b></div>`; }
-function setMode(mode){ state.mode=mode; document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode)); $('journal').classList.toggle('hidden',mode!=='journal'); $('travelPanel').classList.toggle('hidden',mode!=='travel'); $('dashboard').classList.toggle('hidden',mode!=='dashboard'); if(mode==='journal') renderJournal(); if(mode==='travel') renderTravel(); if(mode==='dashboard') renderDashboard(); setTimeout(()=>map?.invalidateSize(),80); }
-function updateControls(){ document.querySelectorAll('[data-base]').forEach(b=>b.classList.toggle('active',b.dataset.base===state.base)); document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.layer])); document.querySelectorAll('[data-quick-base]').forEach(b=>b.classList.toggle('active',b.dataset.quickBase===state.base)); document.querySelectorAll('[data-quick-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.quickLayer])); document.querySelectorAll('[data-route-type]').forEach(b=>b.classList.toggle('active',b.dataset.routeType===state.routeType)); const d=$('diagnosticBox'); if(d) d.innerHTML=`V3.4.5 · PR ${trails.length} · gefiltert ${filtered.length} · aktiv ${state.selectedTrailId||'–'} · Theme ${state.settings.theme}`; }
+function setMode(mode){
+    if(mode === 'map') prxEnsureMapStarted('mode-map'); state.mode=mode; document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode)); $('journal').classList.toggle('hidden',mode!=='journal'); $('travelPanel').classList.toggle('hidden',mode!=='travel'); $('dashboard').classList.toggle('hidden',mode!=='dashboard'); if(mode==='journal') renderJournal(); if(mode==='travel') renderTravel(); if(mode==='dashboard') renderDashboard(); setTimeout(()=>map?.invalidateSize(),80); }
+function updateControls(){ document.querySelectorAll('[data-base]').forEach(b=>b.classList.toggle('active',b.dataset.base===state.base)); document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.layer])); document.querySelectorAll('[data-quick-base]').forEach(b=>b.classList.toggle('active',b.dataset.quickBase===state.base)); document.querySelectorAll('[data-quick-layer]').forEach(b=>b.classList.toggle('active',!!state.layers[b.dataset.quickLayer])); document.querySelectorAll('[data-route-type]').forEach(b=>b.classList.toggle('active',b.dataset.routeType===state.routeType)); const d=$('diagnosticBox'); if(d) d.innerHTML=`V3.4.6 · PR ${trails.length} · gefiltert ${filtered.length} · aktiv ${state.selectedTrailId||'–'} · Theme ${state.settings.theme}`; }
 
 function bind(){
   $('fitBtn').onclick=()=>state.selectedTrailId?centerTrail(state.selectedTrailId,true):fitAll(); $('locateBtn').onclick=()=>map.locate({setView:true,maxZoom:14}); $('layerBtn').onclick=()=>$('layerPanel').classList.toggle('hidden'); $('closeLayers').onclick=()=>$('layerPanel').classList.add('hidden'); $('settingsBtn').onclick=()=>$('settingsPanel').classList.remove('hidden'); $('closeSettings').onclick=()=>$('settingsPanel').classList.add('hidden'); $('searchBtn').onclick=()=>$('searchPanel').classList.toggle('hidden'); $('closeSearch').onclick=()=>$('searchPanel').classList.add('hidden'); $('closeTravel').onclick=()=>setMode('map'); $('closeDashboard').onclick=()=>setMode('map'); $('closeCarousel').onclick=hideCarousel;
@@ -287,4 +291,28 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   window.addEventListener('orientationchange', function(){ stableInvalidateMap('orientationchange'); });
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', function(){ stableInvalidateMap('visualViewport.resize'); });
+  }
+
+  function prxEnsureMapStarted(reason){
+    if(prxLazyMapStarted){
+      if(typeof stableInvalidateMap === 'function') stableInvalidateMap(reason || 'lazy-existing');
+      return;
+    }
+    prxLazyMapStarted = true;
+    initMap();
+    if(typeof stableInvalidateMap === 'function') stableInvalidateMap(reason || 'lazy-init');
+  }
+
+  function prxEnterFromIntro(){
+    var intro = document.getElementById('introScreen');
+    if(intro) intro.classList.add('hidden');
+    document.body.classList.remove('intro-active');
+    prxEnsureMapStarted('intro-start');
+    if(typeof setMode === 'function') setMode('map');
+  }
+
+  function prxBindIntro(){
+    document.body.classList.add('intro-active');
+    var btn = document.getElementById('introStartBtn');
+    if(btn) btn.addEventListener('click', prxEnterFromIntro);
   }

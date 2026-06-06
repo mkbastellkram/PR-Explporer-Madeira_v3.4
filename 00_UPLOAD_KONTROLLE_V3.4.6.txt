@@ -1,0 +1,19 @@
+PR-Explorer V3.4.6 INTRO + LAZY MAP INIT
+
+Zweck:
+- Schwarzes Intro-Overlay als einfacher Test.
+- Leaflet-Karte wird nicht direkt beim App-Start initialisiert.
+- Start erst nach Klick auf „Los geht’s“ oder beim ersten Kartenaufruf.
+- Bestehender V3.4.5D Safe-Area Map Container Fix bleibt erhalten.
+- Kein Single-File-Umbau.
+
+Kontrolle:
+- index.html beginnt mit <!doctype html>
+- index.html enthält introScreen
+- style.css enthält V3.4.6 Intro / Lazy Map Init Test
+- app.js enthält prxEnsureMapStarted(reason)
+- app.js enthält prxBindIntro()
+- app.js Syntaxprüfung per node --check bestanden
+
+Test-URL:
+https://mkbastellkram.github.io/PR-Explorer-Madeira_v3.4/index.html?v=3.4.6
