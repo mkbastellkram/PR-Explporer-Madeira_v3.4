@@ -33,7 +33,7 @@ html{height:-webkit-fill-available}body{overflow:hidden;background:var(--bg);col
 .empty-action{margin-top:10px}
 
 
-/* V3.4.8 Compliance: Cupertino-orientierte Bedienicons + harte POI-Piktogramme */
+/* V3.4.9 Compliance: Cupertino-orientierte Bedienicons + harte POI-Piktogramme */
 .cu{
   display:inline-flex;align-items:center;justify-content:center;
   width:1.24em;height:1.24em;position:relative;line-height:1;
@@ -85,7 +85,7 @@ html{height:-webkit-fill-available}body{overflow:hidden;background:var(--bg);col
 .context-thumb.tunnel,.context-marker.tunnel{background:#ece7df;color:#43362c}
 .feature-badges{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 10px}.feature-badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line-dark);background:rgba(255,255,255,.70);border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;color:var(--text)}.feature-badge.tunnel{background:#ece7df;color:#43362c}.feature-badge.waterfall{background:#dff3ff;color:#0b4c72}
 
-/* V3.4.8 Safe-Area Map Container Fix
+/* V3.4.9 Safe-Area Map Container Fix
    Kernregel: Leaflet-Map startet nicht mehr mit inset:0.
    Die Karte endet initial oberhalb der Modebar + Home-Indikator.
 */
@@ -100,7 +100,7 @@ html{height:-webkit-fill-available}body{overflow:hidden;background:var(--bg);col
   }
 }
 
-/* V3.4.8 Intro / Lazy Map Init Fix */
+/* V3.4.9 Intro / Lazy Map Init Fix */
 .intro-screen{
   position:absolute;
   inset:0;
@@ -172,7 +172,7 @@ body.intro-active .detail-sheet{
   pointer-events:none;
 }
 
-/* V3.4.8 Fullscreen Map + Safe-Area Overlay Patch
+/* V3.4.9 Fullscreen Map + Safe-Area Overlay Patch
    Karte läuft vollflächig bis an den Displayrand.
    Die Modebar liegt als Overlay darüber und schützt ihren Inhalt über env(safe-area-inset-bottom).
 */
@@ -209,4 +209,22 @@ body{min-height:-webkit-fill-available}
   padding:6px 10px calc(6px + env(safe-area-inset-bottom));
   z-index:800;
 }
+
+/* V3.4.9 Cache-Bypass Test Banner */
+.cache-bypass-banner{
+  position:fixed;
+  z-index:3000;
+  top:calc(6px + env(safe-area-inset-top));
+  left:50%;
+  transform:translateX(-50%);
+  padding:7px 11px;
+  border-radius:999px;
+  background:#ff3b30;
+  color:white;
+  font:700 11px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,sans-serif;
+  letter-spacing:.02em;
+  box-shadow:0 8px 22px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+body.intro-active .cache-bypass-banner{display:block}
 

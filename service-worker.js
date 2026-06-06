@@ -1,5 +1,18 @@
-const CACHE='pr-explorer-v3-4-4';
-const ASSETS=['./','./index.html','./style.css','./app.js','./data.js','./manifest.webmanifest'];
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{});return r;}).catch(()=>caches.match(e.request)));});
+// PR Explorer V3.4.9 CACHE BYPASS TEST
+// Dieser Service Worker cacht bewusst nichts und räumt alte Caches ab.
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+  );
+});
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+self.addEventListener('fetch', event => {
+  event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => fetch(event.request)));
+});

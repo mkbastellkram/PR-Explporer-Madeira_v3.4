@@ -1,0 +1,14 @@
+PR-Explorer V3.4.9 CACHE BYPASS TEST
+
+Zweck:
+- Prüfen, ob das iPhone wirklich die neue Version lädt.
+- Service Worker wird deaktiviert/geleert.
+- Alte Caches werden gelöscht.
+- Sichtbarer roter Banner oben: "V3.4.9 · Cache-Bypass aktiv".
+
+Wenn dieser rote Banner NICHT erscheint:
+- GitHub Upload nicht korrekt oder iPhone lädt weiter alte Dateien.
+- Dann nicht weiter patchen, sondern Cache/Upload zuerst klären.
+
+Test-URL:
+https://mkbastellkram.github.io/PR-Explorer-Madeira_v3.4/index.html?v=3.4.9-cache

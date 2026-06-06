@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-  <title>PR Explorer Madeira · V3.4.8</title>
+  <title>PR Explorer Madeira · V3.4.9</title>
   <meta name="theme-color" content="#06211e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,13 +15,17 @@
 </head>
 <body data-theme="madeira_deep_forest" data-glass="light" data-icon-size="medium">
 <div id="app">
+  <div id="cacheBypassBanner" class="cache-bypass-banner">
+    V3.4.9 · Cache-Bypass aktiv
+  </div>
+
   <section id="introScreen" class="intro-screen" aria-label="PR Explorer Start">
     <div class="intro-card">
       <div class="intro-kicker">MADEIRA · JUNI 2026</div>
       <h1>PR Explorer</h1>
       <p>Startpuffer für iOS: Die Karte wird erst nach dem Antippen geladen, damit der Displayrand stabil gesetzt ist.</p>
       <button id="introStartBtn" class="intro-start" type="button">Los geht’s →</button>
-      <small>V3.4.8 · Intro + Lazy Map Init</small>
+      <small>V3.4.9 · Intro + Lazy Map Init</small>
     </div>
   </section>
 
@@ -31,7 +35,7 @@
     <div class="brand">
       <span>MADEIRA</span>
       <strong>PR Explorer</strong>
-      <em>V3.4.8</em>
+      <em>V3.4.9</em>
     </div>
     <div class="top-actions">
       <button id="locateBtn" class="glass-btn" title="Standort"><span class="cu cu-location"></span></button>
@@ -154,5 +158,26 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./data.js"></script>
 <script src="./app.js"></script>
+
+<script id="prx-cache-bypass-test">
+(function(){
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        regs.forEach(function(reg){ reg.unregister(); });
+      });
+    }
+    if (window.caches) {
+      caches.keys().then(function(keys){
+        keys.forEach(function(k){ caches.delete(k); });
+      });
+    }
+    localStorage.setItem('prxCacheBypassTest','3.4.9');
+  } catch(e) {
+    console.warn('PRX cache bypass cleanup failed', e);
+  }
+})();
+</script>
+
 </body>
 </html>
